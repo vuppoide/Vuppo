@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out/
+build/
+*.exe
+*.asar
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+{
+  "name": "vuppo",
+  "version": "1.0.0",
+  "description": "Auditor local de segurança para projetos de software",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --check main.js && node --check scanner.js && node --check auth.js",
+    "dist": "electron-builder --win portable"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.56.0"
+  },
+  "build": {
+    "appId": "com.vuppo.security",
+    "productName": "Vuppo",
+    "files": ["main.js", "preload.js", "scanner.js", "auth.js", "index.html", "styles.css", "renderer.js", "mesh.svg", "package.json"],
+    "win": { "target": "portable", "artifactName": "VUPPO-Security-${version}.${ext}" }
+  }
+}
