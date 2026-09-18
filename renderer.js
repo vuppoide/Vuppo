@@ -206,13 +206,129 @@ function setupWorkspaceControls(workspace) {
   };
   sidebar.insertAdjacentHTML('beforeend', sideViews.git + sideViews.extensions + sideViews.settings);
   editor.insertAdjacentHTML('beforeend', '<section class="workspace-feature-panel preview-panel hidden" data-feature-panel="preview"><div class="preview-browser-bar"><button type="button" class="preview-target">▣ <span>Desktop</span>⌄</button><div class="preview-url"><span>◉</span>http://localhost:3000</div><button type="button" aria-label="Atualizar preview">↻</button><button type="button" aria-label="Abrir preview em nova janela">↗</button><button type="button" class="feature-close" aria-label="Fechar Preview">×</button></div><div class="preview-empty"><div class="preview-browser-icon"><i></i><i></i><i></i><span></span></div><strong>No preview available</strong><span>Run your project to see the preview here.</span></div></section><section class="workspace-feature-panel terminal-panel hidden" data-feature-panel="terminal"><div class="terminal-heading"><div class="terminal-tabs"><button class="terminal-tab active" type="button">powershell</button></div><div class="terminal-controls"><button type="button" class="terminal-control terminal-new" title="Novo terminal" aria-label="Novo terminal">+</button><button type="button" class="terminal-control terminal-maximize" title="Maximizar terminal" aria-label="Maximizar terminal">□</button><button type="button" class="terminal-control terminal-trash" title="Fechar terminal" aria-label="Fechar terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg></button></div></div><div class="terminal-output"><span class="terminal-prompt">PS Vuppo&gt;</span><span class="terminal-cursor"></span></div></section><section class="workspace-feature-panel chat-panel hidden" data-feature-panel="chat"><header class="chat-heading"><div class="chat-title"><span class="chat-agent-icon">V</span><strong>Vuppo Chat</strong><span class="chat-status-dot"></span></div><div class="chat-heading-actions"><button type="button" class="chat-heading-button" title="Novo chat" aria-label="Novo chat">+</button><button type="button" class="feature-close" aria-label="Fechar Chat">Fechar</button></div></header><div class="chat-thread"><div class="chat-welcome"><span class="chat-welcome-icon">V</span><strong>Como posso ajudar?</strong><p>Analise o código, explique um achado ou sugira uma correção.</p></div></div><div class="chat-composer"><div class="chat-input"><span>Mensagem para Vuppo...</span><b>↑</b></div><div class="chat-composer-footer"><button type="button" class="chat-model">Vuppo Security <span>⌄</span></button><span class="chat-shortcut">Enter para enviar</span></div></div></section>');
-  const terminalViewPanel = editor.querySelector('[data-feature-panel="terminal"]');
-  terminalViewPanel.querySelector('.terminal-tab').classList.add('terminal-base-tab');
-  terminalViewPanel.querySelector('.terminal-tab').textContent = 'Terminal';
-  terminalViewPanel.querySelector('.terminal-output').innerHTML = '<span class="terminal-status-dot"></span><span class="terminal-prompt">~/my-project</span><span class="terminal-prompt-arrow">&gt;</span><span class="terminal-cursor"></span>';
   const previewPanel = editor.querySelector('[data-feature-panel="preview"]');
   previewPanel.querySelector('.preview-target').innerHTML = '<span class="desktop-icon">▣</span><span>Desktop</span><b>⌄</b>';
   previewPanel.querySelector('.preview-url span').className = 'globe-icon';
+  const chatPanel = editor.querySelector('[data-feature-panel="chat"]');
+  chatPanel.querySelector('.chat-title strong').textContent = 'Chat';
+  const chatHeadingActions = chatPanel.querySelector('.chat-heading-actions');
+  chatHeadingActions.innerHTML = '<button type="button" class="chat-heading-button chat-menu-button" title="Mais opções" aria-label="Mais opções">⋯</button><div class="chat-actions-menu hidden"><button type="button" data-chat-action="new">Novo chat</button><button type="button" data-chat-action="history">Histórico</button><button type="button" data-chat-action="close">Fechar chat</button></div>';
+  chatPanel.querySelector('.chat-model').textContent = 'Modelo';
+  const chatThread = chatPanel.querySelector('.chat-thread');
+  chatThread.insertAdjacentHTML('beforeend', '<div class="chat-history hidden"><strong>Histórico</strong><span>Nenhuma conversa salva ainda.</span></div>');
+  const chatInput = chatPanel.querySelector('.chat-input');
+  chatInput.innerHTML = '<button type="button" class="chat-attach" title="Adicionar arquivo ou imagem" aria-label="Adicionar arquivo ou imagem">+</button><textarea rows="1" placeholder="Digite uma mensagem..." aria-label="Mensagem para o chat"></textarea><button type="button" class="chat-send" title="Enviar mensagem" aria-label="Enviar mensagem">↑</button><input class="chat-file-input" type="file" accept="image/*,.txt,.md,.json,.js,.ts,.html,.css" multiple hidden />';
+  const chatHistory = chatPanel.querySelector('.chat-history');
+  const chatMessageInput = chatInput.querySelector('textarea');
+  const chatFileInput = chatInput.querySelector('.chat-file-input');
+  const appendChatMessage = (message, className) => {
+    const messageElement = document.createElement('div');
+    messageElement.className = `chat-message ${className}`;
+    messageElement.textContent = message;
+    chatThread.insertBefore(messageElement, chatHistory);
+  };
+  const sendChatMessage = () => {
+    const message = chatMessageInput.value.trim();
+    if (!message) return;
+    appendChatMessage(message, 'chat-message-user');
+    chatMessageInput.value = '';
+    chatMessageInput.style.height = '';
+  };
+  chatPanel.querySelector('.chat-attach').addEventListener('click', () => chatFileInput.click());
+  chatFileInput.addEventListener('change', () => {
+    [...chatFileInput.files].forEach((file) => appendChatMessage(`Arquivo anexado: ${file.name}`, 'chat-message-file'));
+  });
+  chatPanel.querySelector('.chat-send').addEventListener('click', sendChatMessage);
+  chatMessageInput.addEventListener('input', () => {
+    chatMessageInput.style.height = '';
+    chatMessageInput.style.height = `${Math.min(chatMessageInput.scrollHeight, 100)}px`;
+  });
+  chatMessageInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendChatMessage();
+    }
+  });
+  const chatActionsMenu = chatPanel.querySelector('.chat-actions-menu');
+  chatPanel.querySelector('.chat-menu-button').addEventListener('click', () => chatActionsMenu.classList.toggle('hidden'));
+  chatActionsMenu.querySelector('[data-chat-action="new"]').addEventListener('click', () => {
+    chatThread.querySelectorAll('.chat-message').forEach((message) => message.remove());
+    chatHistory.classList.add('hidden');
+    chatActionsMenu.classList.add('hidden');
+  });
+  chatActionsMenu.querySelector('[data-chat-action="history"]').addEventListener('click', () => {
+    chatHistory.classList.toggle('hidden');
+    chatActionsMenu.classList.add('hidden');
+  });
+  chatActionsMenu.querySelector('[data-chat-action="close"]').addEventListener('click', () => {
+    chatPanel.classList.add('hidden');
+    workspace.querySelector('.top-action-button[title="Chat"]')?.classList.remove('active');
+    workspace.classList.remove('chat-open');
+    chatActionsMenu.classList.add('hidden');
+  });
+  const terminalPanel = editor.querySelector('[data-feature-panel="terminal"]');
+  const terminalTabs = terminalPanel.querySelector('.terminal-tabs');
+  terminalTabs.querySelector('.terminal-tab').innerHTML = '<span class="terminal-tab-label">Terminal</span><span class="terminal-tab-close" role="button" aria-label="Remover sessão">×</span>';
+  const terminalOutput = terminalPanel.querySelector('.terminal-output');
+  const terminalMaximize = terminalPanel.querySelector('.terminal-maximize');
+  const activateTerminal = (tab) => {
+    terminalTabs.querySelectorAll('.terminal-tab').forEach((item) => item.classList.toggle('active', item === tab));
+    terminalOutput.querySelector('.terminal-session-name')?.remove();
+    terminalOutput.insertAdjacentHTML('afterbegin', `<span class="terminal-session-name">${tab.querySelector('.terminal-tab-label').textContent}</span>`);
+  };
+  const updateTerminalLimit = () => {
+    const newTerminalButton = terminalPanel.querySelector('.terminal-new');
+    const limitReached = terminalTabs.children.length >= 7;
+    newTerminalButton.disabled = limitReached;
+    newTerminalButton.title = limitReached ? 'Limite de 7 sessões atingido' : 'Novo terminal';
+  };
+  terminalTabs.addEventListener('click', (event) => {
+    const close = event.target.closest('.terminal-tab-close');
+    if (close) {
+      const tab = close.closest('.terminal-tab');
+      if (terminalTabs.children.length > 1) {
+        const nextTab = tab.nextElementSibling || tab.previousElementSibling;
+        tab.remove();
+        activateTerminal(nextTab);
+        updateTerminalLimit();
+      }
+      event.stopPropagation();
+      return;
+    }
+    const tab = event.target.closest('.terminal-tab');
+    if (tab) activateTerminal(tab);
+  });
+  terminalPanel.querySelector('.terminal-new').addEventListener('click', () => {
+    if (terminalTabs.children.length >= 7) return;
+    const usedNames = new Set([...terminalTabs.querySelectorAll('.terminal-tab-label')].map((label) => label.textContent));
+    let terminalNumber = 2;
+    while (usedNames.has(`Terminal ${terminalNumber}`)) terminalNumber += 1;
+    const tab = document.createElement('button');
+    tab.className = 'terminal-tab';
+    tab.type = 'button';
+    tab.innerHTML = `<span class="terminal-tab-label">Terminal ${terminalNumber}</span><span class="terminal-tab-close" role="button" aria-label="Remover sessão">×</span>`;
+    terminalTabs.appendChild(tab);
+    activateTerminal(tab);
+    updateTerminalLimit();
+  });
+  terminalMaximize.addEventListener('click', () => {
+    const maximized = terminalPanel.classList.toggle('is-maximized');
+    terminalMaximize.textContent = maximized ? '❐' : '□';
+    terminalMaximize.title = maximized ? 'Restaurar terminal' : 'Maximizar terminal';
+    terminalMaximize.setAttribute('aria-label', terminalMaximize.title);
+  });
+  terminalPanel.querySelector('.terminal-trash').addEventListener('click', () => {
+    const activeTab = terminalTabs.querySelector('.terminal-tab.active');
+    if (terminalTabs.children.length > 1) {
+      const nextTab = activeTab.nextElementSibling || activeTab.previousElementSibling;
+      activeTab.remove();
+      activateTerminal(nextTab);
+      updateTerminalLimit();
+      return;
+    }
+    terminalPanel.classList.add('hidden');
+    workspace.querySelector('.top-action-button[title="Terminal"]')?.classList.remove('active');
+  });
   workspace.querySelector('.workspace-topbar').insertAdjacentHTML('beforeend', '<div class="profile-menu hidden"><strong>Perfil</strong><span>Conta local Vuppo</span><button type="button" class="profile-close">Fechar</button></div>');
   workspace.querySelector('.profile-button').insertAdjacentHTML('afterend', '<div class="window-controls" aria-label="Controles da janela"><button type="button" class="window-control" data-window-action="minimize" title="Minimizar" aria-label="Minimizar"><span class="window-icon minimize-icon"></span></button><button type="button" class="window-control" data-window-action="maximize" title="Maximizar" aria-label="Maximizar"><span class="window-icon maximize-icon"></span></button><button type="button" class="window-control window-close" data-window-action="close" title="Fechar" aria-label="Fechar"><span class="close-icon">×</span></button></div>');
   const openWorkspaceView = (view, button) => {
@@ -288,29 +404,9 @@ function setupWorkspaceControls(workspace) {
   });
   workspace.querySelector('.panel-eyebrow')?.remove();
   workspace.querySelector('.finding-total')?.remove();
-  const terminalPanel = workspace.querySelector('.terminal-panel');
-  const terminalTabs = terminalPanel.querySelector('.terminal-tabs');
-  let nextTerminalNumber = 2;
   const syncFeatureButtons = () => workspace.querySelectorAll('.top-action-button').forEach((item) => {
-    const itemPanel = workspace.querySelector(`[data-feature-panel="${item.title.toLowerCase()}"]`);
+    const itemPanel = workspace.querySelector(`[data-feature-panel="${item.title.toLowerCase()}" ]`);
     item.classList.toggle('active', Boolean(itemPanel && !itemPanel.classList.contains('hidden')));
-  });
-  terminalPanel.querySelector('.terminal-new').addEventListener('click', () => {
-    terminalTabs.insertAdjacentHTML('beforeend', `<button class="terminal-tab terminal-extra" type="button">Terminal ${nextTerminalNumber}</button>`);
-    nextTerminalNumber += 1;
-  });
-  terminalTabs.addEventListener('click', (event) => {
-    const tab = event.target.closest('.terminal-extra');
-    if (tab) tab.remove();
-  });
-  terminalPanel.querySelector('.terminal-maximize').addEventListener('click', (event) => {
-    const isMaximized = terminalPanel.classList.toggle('is-maximized');
-    event.currentTarget.textContent = isMaximized ? '▽' : '□';
-    event.currentTarget.setAttribute('aria-label', isMaximized ? 'Restaurar terminal' : 'Maximizar terminal');
-  });
-  terminalPanel.querySelector('.terminal-trash').addEventListener('click', () => {
-    terminalPanel.classList.add('hidden');
-    syncFeatureButtons();
   });
   workspace.querySelectorAll('.feature-close').forEach((button) => button.addEventListener('click', () => {
     const panel = button.closest('.workspace-feature-panel');
