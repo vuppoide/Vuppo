@@ -22,7 +22,7 @@
   "build": {
     "appId": "com.vuppo.security",
     "productName": "Vuppo",
-    "files": ["main.js", "preload.js", "scanner.js", "auth.js", "index.html", "styles.css", "renderer.js", "mesh.svg", "vuppo-logo.png", "package.json"],
+    "files": ["main.js", "preload.js", "scanner.js", "auth.js", "index.html", "styles.css", "renderer.js", "mesh.svg", "vuppo-logo.png", "vuppo-icon.png", "assets/vuppo-icon.svg", "package.json"],
     "win": { "target": "portable", "artifactName": "VUPPO-Security-${version}.${ext}" }
   }
 }

@@ -4,6 +4,11 @@ const path = require('path');
 const { scanProject } = require('./scanner');
 const { createAuthStore } = require('./auth');
 
+function isWindowExpanded(window) {
+  const bounds = window.getBounds();
+  return window.isMaximized() || bounds.width >= 1400 || bounds.height >= 900;
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1440,
@@ -22,6 +27,7 @@ function createWindow() {
   });
 
   window.loadFile('index.html');
+  window.maximize();
 }
 
 app.whenReady().then(() => {
@@ -58,12 +64,19 @@ app.whenReady().then(() => {
   ipcMain.handle('window-toggle-maximize', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) return false;
-    const maximized = !window.isMaximized();
-    if (maximized) window.maximize();
-    else window.unmaximize();
-    return maximized;
+    const expanded = isWindowExpanded(window);
+    if (!expanded) window.maximize();
+    else {
+      window.unmaximize();
+      window.setSize(1100, 700);
+      window.center();
+    }
+    return !expanded;
   });
-  ipcMain.handle('window-is-maximized', (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() || false);
+  ipcMain.handle('window-is-maximized', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return window ? isWindowExpanded(window) : false;
+  });
   ipcMain.handle('window-close', (event) => BrowserWindow.fromWebContents(event.sender)?.close());
 
   createWindow();

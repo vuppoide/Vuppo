@@ -195,7 +195,15 @@ function setupWorkspaceControls(workspace) {
   securityPanel.classList.add('is-collapsed');
   body.classList.add('security-closed');
   workspace.querySelector('.workspace-topbar').insertAdjacentHTML('afterbegin', '<nav class="workspace-menus" aria-label="Menu do workspace"><div class="workspace-menu"><button class="workspace-menu-button" type="button" aria-expanded="false">File</button><div class="workspace-menu-dropdown"><button type="button" data-workspace-view="explorer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9.5a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg><span>Explorer</span></button></div></div><div class="workspace-menu"><button class="workspace-menu-button" type="button" aria-expanded="false">Workspace</button><div class="workspace-menu-dropdown"><button type="button" data-workspace-view="git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg><span>Source control</span></button><button type="button" data-workspace-view="extensions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4h4v2H3v4a2 2 0 0 0 2 2h4v-4h2v4h4v-4h2a2 2 0 0 0 2-2v-4h-4V5a2 2 0 0 0-2-2h-4v4H9V3Z"/></svg><span>Extensões</span></button><button type="button" data-workspace-view="security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/></svg><span>Security Problems</span></button></div></div></nav>');
+  workspace.querySelector('.workspace-topbar').insertAdjacentHTML('afterbegin', '<nav class="workspace-menus" aria-label="Menu do workspace"><div class="workspace-menu"><button class="workspace-menu-button file-menu-button" type="button" aria-expanded="false"><img src="vuppo-icon.png" alt="" />File</button><div class="workspace-menu-dropdown"><button type="button" data-workspace-view="explorer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9.5a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg><span>Explorer</span></button></div></div><div class="workspace-menu"><button class="workspace-menu-button" type="button" aria-expanded="false">Workspace</button><div class="workspace-menu-dropdown"><button type="button" data-workspace-view="git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg><span>Source control</span></button><button type="button" data-workspace-view="extensions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4h4v2H3v4a2 2 0 0 0 2 2h4v-4h2v4h4v-4h2a2 2 0 0 0 2-2v-4h-4V5a2 2 0 0 0-2-2h-4v4H9V3Z"/></svg><span>Extensões</span></button><button type="button" data-workspace-view="security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/></svg><span>Security Problems</span></button></div></div></nav>');
     workspace.querySelector('.workspace-menu-dropdown').insertAdjacentHTML('beforeend', '<button type="button" data-file-action="new-file"><span>New File</span></button><button type="button" data-file-action="new-window"><span>New Window</span></button><button type="button" data-file-action="open-file"><span>Open File...</span></button><button type="button" data-file-action="open-folder"><span>Open Folder...</span></button><button type="button" data-file-action="open-project"><span>Open Project...</span></button><button type="button" data-file-action="open-recent"><span>Open Recent</span></button><button type="button" data-file-action="save"><span>Save</span></button><button type="button" data-file-action="save-as"><span>Save As...</span></button><button type="button" data-file-action="save-all"><span>Save All</span></button><button type="button" data-file-action="close-editor"><span>Close Editor</span></button><button type="button" data-file-action="close-folder"><span>Close Folder</span></button><button type="button" data-file-action="exit"><span>Exit</span></button>');
+  workspace.querySelectorAll('.workspace-menus').forEach((menu, index) => { if (index > 0) menu.remove(); });
+  const fileButton = workspace.querySelector('.file-menu-button');
+  const fileIcon = fileButton?.querySelector('img');
+  if (fileButton && fileIcon) {
+    fileIcon.className = 'file-menu-icon';
+    fileButton.closest('.workspace-menu').before(fileIcon);
+  }
   workspace.querySelector('[data-workspace-view="extensions"]')?.remove();
   workspace.querySelectorAll('.top-action-button').forEach((button) => button.classList.remove('active'));
   const sideViews = {
@@ -211,6 +219,8 @@ function setupWorkspaceControls(workspace) {
   previewPanel.querySelector('.preview-url span').className = 'globe-icon';
   const chatPanel = editor.querySelector('[data-feature-panel="chat"]');
   chatPanel.querySelector('.chat-title strong').textContent = 'Chat';
+  chatPanel.querySelector('.chat-agent-icon')?.remove();
+  chatPanel.querySelector('.chat-welcome-icon')?.remove();
   const chatHeadingActions = chatPanel.querySelector('.chat-heading-actions');
   chatHeadingActions.innerHTML = '<button type="button" class="chat-heading-button chat-menu-button" title="Mais opções" aria-label="Mais opções">⋯</button><div class="chat-actions-menu hidden"><button type="button" data-chat-action="new">Novo chat</button><button type="button" data-chat-action="history">Histórico</button><button type="button" data-chat-action="close">Fechar chat</button></div>';
   chatPanel.querySelector('.chat-model').textContent = 'Modelo';
@@ -423,15 +433,20 @@ function setupWorkspaceControls(workspace) {
   const maximizeButton = workspace.querySelector('[data-window-action="maximize"]');
   const setWindowState = (isMaximized) => {
     const icon = maximizeButton.querySelector('.window-icon');
-    icon.classList.toggle('maximize-icon', !isMaximized);
-    icon.classList.toggle('restore-icon', isMaximized);
+    icon.className = `window-icon ${isMaximized ? 'restore-icon' : 'maximize-icon'}`;
     maximizeButton.title = isMaximized ? 'Restaurar' : 'Maximizar';
     maximizeButton.setAttribute('aria-label', maximizeButton.title);
   };
   workspace.querySelector('[data-window-action="minimize"]').addEventListener('click', () => window.vuppo.minimizeWindow());
-  maximizeButton.addEventListener('click', async () => setWindowState(await window.vuppo.toggleMaximizeWindow()));
+  let windowStateRequest = 0;
+  const syncWindowState = async (statePromise) => {
+    const request = ++windowStateRequest;
+    const state = await statePromise;
+    if (request === windowStateRequest) setWindowState(state);
+  };
+  maximizeButton.addEventListener('click', () => syncWindowState(window.vuppo.toggleMaximizeWindow()));
   workspace.querySelector('[data-window-action="close"]').addEventListener('click', () => window.vuppo.closeWindow());
-  window.vuppo.isWindowMaximized().then(setWindowState);
+  syncWindowState(window.vuppo.isWindowMaximized());
   profileButton.addEventListener('click', () => profileMenu.classList.toggle('hidden'));
   profileMenu.querySelector('.profile-close').addEventListener('click', () => profileMenu.classList.add('hidden'));
 }
