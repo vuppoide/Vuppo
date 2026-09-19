@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
 const { execFile } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const { scanProject } = require('./scanner');
 const { createAuthStore } = require('./auth');
@@ -57,6 +58,14 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
+  ipcMain.handle('material-icon-catalog', async () => JSON.parse(await fs.promises.readFile(path.join(__dirname, 'assets', 'material-icons.json'), 'utf8')));
+  ipcMain.handle('write-file', async (_event, { projectPath, filePath, content }) => {
+    const root = path.resolve(projectPath);
+    const target = path.resolve(filePath);
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Arquivo fora do projeto.');
+    await fs.promises.writeFile(target, content, 'utf8');
+    return true;
+  });
   ipcMain.handle('open-file', async (_event, filePath) => {
     await shell.openPath(filePath);
   });

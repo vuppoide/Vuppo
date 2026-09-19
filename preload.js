@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('vuppo', {
   chooseProject: () => ipcRenderer.invoke('choose-project'),
   cloneRepo: (repoUrl) => ipcRenderer.invoke('clone-repo', repoUrl),
   scanProject: (projectPath) => ipcRenderer.invoke('scan-project', projectPath),
+  getMaterialIconCatalog: () => ipcRenderer.invoke('material-icon-catalog'),
+  writeFile: (fileData) => ipcRenderer.invoke('write-file', fileData),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window-toggle-maximize'),

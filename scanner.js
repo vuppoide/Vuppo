@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const IGNORED = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.next', 'vendor']);
-const EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.py', '.java', '.go', '.rb', '.php', '.env', '.json', '.yml', '.yaml', '.sql', '.sh']);
+const EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.py', '.java', '.go', '.rb', '.php', '.env', '.json', '.yml', '.yaml', '.sql', '.sh', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.xml', '.md', '.txt']);
+const IMAGE_MIMES = new Map([['.png', 'image/png'], ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.jfif', 'image/jpeg'], ['.gif', 'image/gif'], ['.webp', 'image/webp'], ['.avif', 'image/avif'], ['.svg', 'image/svg+xml'], ['.ico', 'image/x-icon'], ['.bmp', 'image/bmp'], ['.tif', 'image/tiff'], ['.tiff', 'image/tiff']]);
 
 const RULES = [
   { id: 'hardcoded-secret', title: 'Possível segredo exposto', severity: 'critical', category: 'Credenciais', pattern: /(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*["'`]([A-Za-z0-9_\-/+=]{8,})["'`]/i, advice: 'Remova o valor do código, revogue a credencial e use variáveis de ambiente ou um cofre de segredos.' },
@@ -18,20 +19,36 @@ const RULES = [
 
 function collectFiles(root, files = []) {
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    if (IGNORED.has(entry.name) || entry.name.startsWith('.')) continue;
+    if (IGNORED.has(entry.name)) continue;
     const fullPath = path.join(root, entry.name);
     if (entry.isDirectory()) collectFiles(fullPath, files);
-    else if (EXTENSIONS.has(path.extname(entry.name).toLowerCase()) || entry.name === '.env') files.push(fullPath);
+    else files.push(fullPath);
   }
   return files;
+}
+
+function isTextFile(filePath) {
+  return EXTENSIONS.has(path.extname(filePath).toLowerCase()) || path.basename(filePath) === '.env';
 }
 
 function scanProject(projectPath) {
   if (!projectPath || !fs.existsSync(projectPath)) throw new Error('Pasta do projeto não encontrada.');
   const started = Date.now();
   const files = collectFiles(projectPath);
+  const scannedFiles = [];
   const findings = [];
+  const scanFiles = files.filter(isTextFile);
   for (const filePath of files) {
+    let content;
+    const mime = IMAGE_MIMES.get(path.extname(filePath).toLowerCase());
+    try {
+      const stats = fs.statSync(filePath);
+      content = mime ? '' : stats.size <= 2 * 1024 * 1024 ? fs.readFileSync(filePath, 'utf8') : '';
+      if (mime && stats.size <= 5 * 1024 * 1024) content = `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+    } catch { content = ''; }
+    scannedFiles.push({ file: path.relative(projectPath, filePath), absoluteFile: filePath, content, mime, isImage: Boolean(mime) });
+  }
+  for (const filePath of scanFiles) {
     let content;
     try { content = fs.readFileSync(filePath, 'utf8'); } catch { continue; }
     const lines = content.split(/\r?\n/);
@@ -46,7 +63,7 @@ function scanProject(projectPath) {
   }
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || a.file.localeCompare(b.file));
-  return { projectPath, projectName: path.basename(projectPath), filesScanned: files.length, findings, durationMs: Date.now() - started, scannedAt: new Date().toISOString() };
+  return { projectPath, projectName: path.basename(projectPath), filesScanned: scannedFiles.length, analyzedFiles: scanFiles.length, files: scannedFiles, findings, durationMs: Date.now() - started, scannedAt: new Date().toISOString() };
 }
 
 module.exports = { scanProject };
