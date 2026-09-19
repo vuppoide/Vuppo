@@ -13,6 +13,15 @@ contextBridge.exposeInMainWorld('vuppo', {
   cloneRepo: (repoUrl) => ipcRenderer.invoke('clone-repo', repoUrl),
   scanProject: (projectPath) => ipcRenderer.invoke('scan-project', projectPath),
   getMaterialIconCatalog: () => ipcRenderer.invoke('material-icon-catalog'),
+  createTerminal: (cwd) => ipcRenderer.invoke('terminal-create', { cwd }),
+  writeTerminal: (id, input) => ipcRenderer.invoke('terminal-write', { id, input }),
+  killTerminal: (id) => ipcRenderer.invoke('terminal-kill', { id }),
+  onTerminalData: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('terminal-data', listener);
+    ipcRenderer.on('terminal-exit', listener);
+    return () => { ipcRenderer.removeListener('terminal-data', listener); ipcRenderer.removeListener('terminal-exit', listener); };
+  },
   writeFile: (fileData) => ipcRenderer.invoke('write-file', fileData),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),

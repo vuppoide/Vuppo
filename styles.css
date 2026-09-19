@@ -1,3 +1,4 @@
+.terminal-screen { flex:1; width:100%; min-height:0; resize:none; overflow:auto; pointer-events:auto; user-select:text; cursor:text; caret-color:#c8f169 !important; border:0; outline:0; padding:64px 22px 18px; color:#e6edf3; background:#141414; font:12px/1.6 'DM Mono',Consolas,monospace; white-space:pre-wrap; scrollbar-width:none; }
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 :root { --bg:#030404; --panel:#101211; --line:#373a38; --text:#f0f1ee; --muted:#9a9d99; --button:#181a18; }
 * { box-sizing:border-box; }
@@ -308,6 +309,11 @@ button { cursor:pointer; }
 .workspace-feature-panel[data-feature-panel="terminal"] .terminal-prompt-arrow { color:#31d68c; }
 .workspace-feature-panel[data-feature-panel="terminal"] .terminal-cursor { background:#dfe7ef; }
 .workspace-feature-panel[data-feature-panel="chat"] { background:#181818; }
+.terminal-screen { flex:1; width:100%; min-height:0; resize:none; overflow:auto; border:0; outline:0; padding:64px 22px 44px; color:#e6edf3; background:#141414; font:12px/1.6 'DM Mono',Consolas,monospace; white-space:pre-wrap; scrollbar-width:none; }
+.terminal-output { display:flex; flex-direction:column; padding:0; }
+.terminal-screen::-webkit-scrollbar { display:none; }
+.terminal-input { position:absolute; right:22px; bottom:10px; left:38px; z-index:3; display:block; width:auto; height:24px; box-sizing:border-box; pointer-events:auto; border:0; border-bottom:1px solid #303030; outline:0; padding:3px 0; color:#e6edf3; background:#141414; font:12px 'DM Mono',Consolas,monospace; caret-color:#c8f169; }
+.terminal-input:focus { border-bottom-color:#c8f169; }
 .workspace-feature-panel[data-feature-panel="chat"] .chat-model,.workspace-feature-panel[data-feature-panel="chat"] .chat-input b { color:#bdbdbd; }
 .scan-button,.export-button { color:#d2d2d2; background:#2a2a2a; }
 .dashboard-icon { color:#d2d2d2; background:#2a2a2a; }

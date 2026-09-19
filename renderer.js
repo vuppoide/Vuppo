@@ -377,12 +377,87 @@ function setupWorkspaceControls(workspace) {
   const terminalTabs = terminalPanel.querySelector('.terminal-tabs');
   terminalTabs.querySelector('.terminal-tab').innerHTML = '<span class="terminal-tab-label">Terminal</span><span class="terminal-tab-close" role="button" aria-label="Remover sessão">×</span>';
   const terminalOutput = terminalPanel.querySelector('.terminal-output');
+  terminalOutput.innerHTML = '<textarea class="terminal-screen" aria-label="Terminal" spellcheck="false"></textarea>';
+  const terminalScreen = terminalPanel.querySelector('.terminal-screen');
+  const terminalInput = terminalScreen;
+  const terminalSessions = new Map();
+  let activeTerminalSession = null;
   const terminalMaximize = terminalPanel.querySelector('.terminal-maximize');
   const activateTerminal = (tab) => {
     terminalTabs.querySelectorAll('.terminal-tab').forEach((item) => item.classList.toggle('active', item === tab));
-    terminalOutput.querySelector('.terminal-session-name')?.remove();
-    terminalOutput.insertAdjacentHTML('afterbegin', `<span class="terminal-session-name">${tab.querySelector('.terminal-tab-label').textContent}</span>`);
+    activeTerminalSession = terminalSessions.get(tab);
+    terminalScreen.value = activeTerminalSession ? `${activeTerminalSession.output}${activeTerminalSession.inputBuffer}` : '';
+    terminalScreen.scrollTop = terminalScreen.scrollHeight;
+    terminalInput.disabled = false;
+    terminalInput.focus();
+    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
   };
+  const appendTerminalOutput = (session, data) => {
+    session.output += data;
+    if (session === activeTerminalSession) {
+      terminalScreen.value = `${session.output}${session.inputBuffer}`;
+      terminalScreen.scrollTop = terminalScreen.scrollHeight;
+      terminalScreen.focus();
+      terminalScreen.setSelectionRange(terminalScreen.value.length, terminalScreen.value.length);
+    }
+  };
+  const createTerminalSession = async (tab) => {
+    const session = terminalSessions.get(tab) || { tab, id: null, output: '', inputBuffer: '' };
+      terminalSessions.set(tab, session);
+      session.inputBuffer = '';
+    try {
+      const terminal = await window.vuppo.createTerminal(currentReport.projectPath);
+      session.id = terminal.id;
+      tab.querySelector('.terminal-tab-label').textContent = terminal.shell;
+      if (session === activeTerminalSession) terminalInput.disabled = false;
+    } catch (error) { appendTerminalOutput(session, `Erro ao iniciar terminal: ${error.message}\r\n`); }
+    return session;
+  };
+  window.vuppo.onTerminalData((payload) => {
+    const session = [...terminalSessions.values()].find((item) => item.id === payload.id);
+    if (session) appendTerminalOutput(session, payload.data || '');
+  });
+  terminalInput.addEventListener('input', () => {
+    if (activeTerminalSession) activeTerminalSession.inputBuffer = terminalInput.value.slice(activeTerminalSession.output.length);
+  });
+  const sendTerminalInput = async () => {
+    if (!activeTerminalSession?.id) return;
+    const input = activeTerminalSession.inputBuffer;
+    if (!input.trim()) return;
+    await window.vuppo.writeTerminal(activeTerminalSession.id, `${input}\r\n`);
+    activeTerminalSession.inputBuffer = '';
+    terminalInput.value = activeTerminalSession.output;
+    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+  };
+  terminalInput.addEventListener('keydown', async (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    await sendTerminalInput();
+  });
+  terminalPanel.addEventListener('keydown', async (event) => {
+    if (event.target === terminalInput) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      await sendTerminalInput();
+      terminalInput.focus();
+      return;
+    }
+    if (event.key === 'Backspace') {
+      event.preventDefault();
+      terminalInput.value = terminalInput.value.slice(0, -1);
+      terminalInput.focus();
+      return;
+    }
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      terminalInput.value += event.key;
+      terminalInput.focus();
+    }
+  });
+  terminalScreen.addEventListener('click', () => {
+    terminalInput.focus();
+    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+  });
   const updateTerminalLimit = () => {
     const newTerminalButton = terminalPanel.querySelector('.terminal-new');
     const limitReached = terminalTabs.children.length >= 7;
@@ -393,6 +468,9 @@ function setupWorkspaceControls(workspace) {
     const close = event.target.closest('.terminal-tab-close');
     if (close) {
       const tab = close.closest('.terminal-tab');
+      const session = terminalSessions.get(tab);
+      if (session?.id) window.vuppo.killTerminal(session.id);
+      terminalSessions.delete(tab);
       if (terminalTabs.children.length > 1) {
         const nextTab = tab.nextElementSibling || tab.previousElementSibling;
         tab.remove();
@@ -415,6 +493,7 @@ function setupWorkspaceControls(workspace) {
     tab.type = 'button';
     tab.innerHTML = `<span class="terminal-tab-label">Terminal ${terminalNumber}</span><span class="terminal-tab-close" role="button" aria-label="Remover sessão">×</span>`;
     terminalTabs.appendChild(tab);
+    createTerminalSession(tab);
     activateTerminal(tab);
     updateTerminalLimit();
   });
@@ -426,6 +505,9 @@ function setupWorkspaceControls(workspace) {
   });
   terminalPanel.querySelector('.terminal-trash').addEventListener('click', () => {
     const activeTab = terminalTabs.querySelector('.terminal-tab.active');
+    const activeSession = terminalSessions.get(activeTab);
+    if (activeSession?.id) window.vuppo.killTerminal(activeSession.id);
+    terminalSessions.delete(activeTab);
     if (terminalTabs.children.length > 1) {
       const nextTab = activeTab.nextElementSibling || activeTab.previousElementSibling;
       activeTab.remove();
@@ -436,6 +518,10 @@ function setupWorkspaceControls(workspace) {
     terminalPanel.classList.add('hidden');
     workspace.querySelector('.top-action-button[title="Terminal"]')?.classList.remove('active');
   });
+  const initialTerminalTab = terminalTabs.querySelector('.terminal-tab');
+  terminalSessions.set(initialTerminalTab, { tab: initialTerminalTab, id: null, output: '', inputBuffer: '' });
+  activateTerminal(initialTerminalTab);
+  createTerminalSession(initialTerminalTab);
   workspace.querySelector('.workspace-topbar').insertAdjacentHTML('beforeend', '<div class="profile-menu hidden"><strong>Perfil</strong><span>Conta local Vuppo</span><button type="button" class="profile-close">Fechar</button></div>');
   workspace.querySelector('.profile-button').insertAdjacentHTML('afterend', '<div class="window-controls" aria-label="Controles da janela"><button type="button" class="window-control" data-window-action="minimize" title="Minimizar" aria-label="Minimizar"><span class="window-icon minimize-icon"></span></button><button type="button" class="window-control" data-window-action="maximize" title="Maximizar" aria-label="Maximizar"><span class="window-icon maximize-icon"></span></button><button type="button" class="window-control window-close" data-window-action="close" title="Fechar" aria-label="Fechar"><span class="close-icon">×</span></button></div>');
   const openWorkspaceView = (view, button) => {
@@ -504,6 +590,7 @@ function setupWorkspaceControls(workspace) {
       if (panel) {
         panel.classList.toggle('hidden', isOpen);
         button.classList.toggle('active', !isOpen);
+        if (feature === 'terminal' && isOpen === false) panel.querySelector('.terminal-input')?.focus();
       }
       workspace.querySelector('.editor-tabs').classList.toggle('preview-active', feature === 'preview' && !isOpen);
       workspace.classList.toggle('preview-open', feature === 'preview' && !isOpen);

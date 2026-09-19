@@ -1,5 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { scanProject } = require('./scanner');
@@ -8,6 +8,16 @@ const { createAuthStore } = require('./auth');
 function isWindowExpanded(window) {
   const bounds = window.getBounds();
   return window.isMaximized() || bounds.width >= 1400 || bounds.height >= 900;
+}
+
+function getTerminalCommand() {
+  if (process.platform === 'win32') {
+    const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    if (fs.existsSync(powershell)) return { command: powershell, args: ['-NoLogo', '-NoProfile'] };
+    return { command: process.env.ComSpec || 'cmd.exe', args: ['/Q', '/D'] };
+  }
+  const command = process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
+  return { command, args: ['-i'] };
 }
 
 function createWindow() {
@@ -34,6 +44,7 @@ function createWindow() {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   const auth = createAuthStore(app.getPath('userData'));
+  const terminalSessions = new Map();
   ipcMain.handle('auth-session', () => auth.getSession());
   ipcMain.handle('auth-signup', (_event, credentials) => auth.signup(credentials));
   ipcMain.handle('auth-signup-code', (_event, credentials) => auth.requestSignupCode(credentials));
@@ -59,6 +70,32 @@ app.whenReady().then(() => {
 
   ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
   ipcMain.handle('material-icon-catalog', async () => JSON.parse(await fs.promises.readFile(path.join(__dirname, 'assets', 'material-icons.json'), 'utf8')));
+  ipcMain.handle('terminal-create', (event, { cwd }) => {
+    if (!cwd || !fs.existsSync(cwd)) throw new Error('Diretório do terminal não encontrado.');
+    const terminal = getTerminalCommand();
+    const processHandle = spawn(terminal.command, terminal.args, { cwd, env: process.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    terminalSessions.set(id, processHandle);
+    const send = (data) => event.sender.send('terminal-data', { id, data: data.toString() });
+    processHandle.stdout.on('data', send);
+    processHandle.stderr.on('data', send);
+    processHandle.on('close', (code) => { event.sender.send('terminal-exit', { id, code }); terminalSessions.delete(id); });
+    processHandle.on('error', (error) => { event.sender.send('terminal-data', { id, data: `\r\nErro ao iniciar terminal: ${error.message}\r\n` }); });
+    return { id, shell: path.basename(terminal.command), platform: process.platform };
+  });
+  ipcMain.handle('terminal-write', (_event, { id, input }) => {
+    const processHandle = terminalSessions.get(id);
+    if (!processHandle || !processHandle.stdin.writable) return false;
+    processHandle.stdin.write(input);
+    return true;
+  });
+  ipcMain.handle('terminal-kill', (_event, { id }) => {
+    const processHandle = terminalSessions.get(id);
+    if (!processHandle) return false;
+    processHandle.kill();
+    terminalSessions.delete(id);
+    return true;
+  });
   ipcMain.handle('write-file', async (_event, { projectPath, filePath, content }) => {
     const root = path.resolve(projectPath);
     const target = path.resolve(filePath);
