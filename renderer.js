@@ -400,20 +400,115 @@ function setupWorkspaceControls(workspace) {
   chatPanel.querySelector('.chat-agent-icon')?.remove();
   chatPanel.querySelector('.chat-welcome-icon')?.remove();
   const chatHeadingActions = chatPanel.querySelector('.chat-heading-actions');
-  chatHeadingActions.innerHTML = '<button type="button" class="chat-heading-button chat-menu-button" title="Mais opções" aria-label="Mais opções">⋯</button><div class="chat-actions-menu hidden"><button type="button" data-chat-action="new">Novo chat</button><button type="button" data-chat-action="history">Histórico</button><button type="button" data-chat-action="close">Fechar chat</button></div>';
-  chatPanel.querySelector('.chat-model').textContent = 'Modelo';
+  chatHeadingActions.innerHTML = '<button type="button" class="chat-heading-button chat-new-button" title="Novo chat" aria-label="Novo chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><button type="button" class="chat-heading-button chat-history-toggle" title="Histórico" aria-label="Histórico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>';
+  chatPanel.querySelector('.chat-model')?.remove();
   const chatThread = chatPanel.querySelector('.chat-thread');
-  chatThread.insertAdjacentHTML('beforeend', '<div class="chat-history hidden"><strong>Histórico</strong><span>Nenhuma conversa salva ainda.</span></div>');
+  chatThread.insertAdjacentHTML('beforeend', '<div class="chat-history hidden"><div class="chat-history-head"><strong>Histórico</strong><button type="button" class="chat-history-clear" title="Excluir todos os históricos" aria-label="Excluir todos os históricos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg><span>Excluir todos</span></button></div><div class="chat-history-list"></div></div>');
   const chatInput = chatPanel.querySelector('.chat-input');
-  chatInput.innerHTML = '<button type="button" class="chat-attach" title="Adicionar arquivo ou imagem" aria-label="Adicionar arquivo ou imagem">+</button><textarea rows="1" placeholder="Digite uma mensagem..." aria-label="Mensagem para o chat"></textarea><button type="button" class="chat-send" title="Enviar mensagem" aria-label="Enviar mensagem">↑</button><input class="chat-file-input" type="file" accept="image/*,.txt,.md,.json,.js,.ts,.html,.css" multiple hidden />';
+  chatInput.innerHTML = '<button type="button" class="chat-attach" title="Adicionar arquivo ou imagem" aria-label="Adicionar arquivo ou imagem">+</button><textarea rows="1" placeholder="Digite uma mensagem..." aria-label="Mensagem para o chat"></textarea><button type="button" class="chat-send" title="Enviar mensagem" aria-label="Enviar mensagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></button><input class="chat-file-input" type="file" accept="image/*,.txt,.md,.json,.js,.ts,.html,.css" multiple hidden />';
   const chatHistory = chatPanel.querySelector('.chat-history');
+  chatPanel.insertBefore(chatHistory, chatPanel.querySelector('.chat-composer'));
+  const chatHistoryList = chatHistory.querySelector('.chat-history-list');
   const chatMessageInput = chatInput.querySelector('textarea');
   const chatFileInput = chatInput.querySelector('.chat-file-input');
-  const appendChatMessage = (message, className) => {
+  const chatHistoryToggle = chatPanel.querySelector('.chat-history-toggle');
+  const chatComposer = chatPanel.querySelector('.chat-composer');
+  const hideChatHistory = () => {
+    chatHistory.classList.add('hidden');
+    chatThread.classList.remove('hidden');
+    chatComposer.classList.remove('hidden');
+    chatHistoryToggle.classList.remove('active');
+  };
+  const chatSessions = [];
+  let activeChatSession = null;
+  const chatSessionTitle = (session, fallbackIndex) => {
+    const firstUser = session.messages.find((item) => item.className === 'chat-message-user');
+    const base = (firstUser || session.messages[0])?.text || '';
+    if (base) return base.length > 34 ? `${base.slice(0, 34)}…` : base;
+    return `Chat ${fallbackIndex + 1}`;
+  };
+  const archiveActiveChatSession = () => {
+    if (!activeChatSession?.messages.length || chatSessions.includes(activeChatSession)) return;
+    chatSessions.unshift(activeChatSession);
+  };
+  const appendChatMessageElement = (text, className) => {
     const messageElement = document.createElement('div');
     messageElement.className = `chat-message ${className}`;
-    messageElement.textContent = message;
-    chatThread.insertBefore(messageElement, chatHistory);
+    messageElement.textContent = text;
+    chatThread.appendChild(messageElement);
+    chatThread.scrollTop = chatThread.scrollHeight;
+    return messageElement;
+  };
+  const appendChatMessage = (message, className) => {
+    if (!activeChatSession) activeChatSession = { id: `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`, title: '', messages: [], createdAt: new Date() };
+    activeChatSession.messages.push({ text: message, className });
+    appendChatMessageElement(message, className);
+  };
+  const appendChatNotice = (text) => appendChatMessageElement(text, 'chat-message-system');
+  const renderChatThread = (session) => {
+    chatThread.querySelectorAll('.chat-message').forEach((message) => message.remove());
+    if (!session) return;
+    session.messages.forEach((item) => appendChatMessageElement(item.text, item.className));
+  };
+  const deleteChatSession = (session) => {
+    const index = chatSessions.indexOf(session);
+    if (index >= 0) chatSessions.splice(index, 1);
+    if (activeChatSession === session) {
+      activeChatSession = null;
+      renderChatThread(null);
+      chatThread.scrollTop = 0;
+    }
+    renderChatHistory();
+  };
+  const renderChatHistory = () => {
+    chatHistoryList.innerHTML = '';
+    const entries = [];
+    if (activeChatSession?.messages.length) entries.push({ session: activeChatSession, current: true });
+    chatSessions.forEach((session) => {
+      if (session !== activeChatSession) entries.push({ session, current: false });
+    });
+    if (!entries.length) {
+      const empty = document.createElement('span');
+      empty.className = 'chat-history-empty';
+      empty.textContent = 'Nenhuma conversa salva ainda.';
+      chatHistoryList.appendChild(empty);
+      return;
+    }
+    entries.forEach((entry, index) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `chat-history-item${entry.current ? ' active' : ''}`;
+      const info = document.createElement('span');
+      info.className = 'chat-history-item-info';
+      const title = document.createElement('strong');
+      title.textContent = chatSessionTitle(entry.session, index);
+      const meta = document.createElement('span');
+      const time = entry.session.createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      meta.textContent = `${entry.session.messages.length} mensagens · ${time}${entry.current ? ' · conversa atual' : ''}`;
+      info.append(title, meta);
+      const remove = document.createElement('span');
+      remove.className = 'chat-history-item-delete';
+      remove.setAttribute('role', 'button');
+      remove.setAttribute('aria-label', 'Excluir conversa');
+      remove.title = 'Excluir conversa';
+      remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg>';
+      item.append(info, remove);
+      item.addEventListener('click', (event) => {
+        if (event.target.closest('.chat-history-item-delete')) {
+          deleteChatSession(entry.session);
+          return;
+        }
+        if (entry.session === activeChatSession) {
+          hideChatHistory();
+          return;
+        }
+        archiveActiveChatSession();
+        activeChatSession = entry.session;
+        renderChatThread(entry.session);
+        hideChatHistory();
+      });
+      chatHistoryList.appendChild(item);
+    });
   };
   const sendChatMessage = () => {
     const message = chatMessageInput.value.trim();
@@ -428,8 +523,16 @@ function setupWorkspaceControls(workspace) {
   });
   chatPanel.querySelector('.chat-send').addEventListener('click', sendChatMessage);
   chatMessageInput.addEventListener('input', () => {
-    chatMessageInput.style.height = '';
+    chatMessageInput.style.height = 'auto';
     chatMessageInput.style.height = `${Math.min(chatMessageInput.scrollHeight, 100)}px`;
+  });
+  chatInput.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    chatMessageInput.focus();
+  });
+  chatPanel.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    chatMessageInput.focus();
   });
   chatMessageInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -437,22 +540,30 @@ function setupWorkspaceControls(workspace) {
       sendChatMessage();
     }
   });
-  const chatActionsMenu = chatPanel.querySelector('.chat-actions-menu');
-  chatPanel.querySelector('.chat-menu-button').addEventListener('click', () => chatActionsMenu.classList.toggle('hidden'));
-  chatActionsMenu.querySelector('[data-chat-action="new"]').addEventListener('click', () => {
+  const toggleChatHistory = () => {
+    const showing = chatHistory.classList.toggle('hidden');
+    chatThread.classList.toggle('hidden', !showing);
+    chatComposer.classList.toggle('hidden', !showing);
+    chatHistoryToggle.classList.toggle('active', !showing);
+    if (!showing) renderChatHistory();
+  };
+  chatPanel.querySelector('.chat-new-button').addEventListener('click', () => {
+    const hadConversation = Boolean(activeChatSession?.messages.length);
+    archiveActiveChatSession();
+    activeChatSession = null;
     chatThread.querySelectorAll('.chat-message').forEach((message) => message.remove());
-    chatHistory.classList.add('hidden');
-    chatActionsMenu.classList.add('hidden');
+    if (hadConversation) appendChatNotice('Conversa anterior salva no histórico.');
+    chatThread.scrollTop = 0;
+    hideChatHistory();
   });
-  chatActionsMenu.querySelector('[data-chat-action="history"]').addEventListener('click', () => {
-    chatHistory.classList.toggle('hidden');
-    chatActionsMenu.classList.add('hidden');
-  });
-  chatActionsMenu.querySelector('[data-chat-action="close"]').addEventListener('click', () => {
-    chatPanel.classList.add('hidden');
-    workspace.querySelector('.top-action-button[title="Chat"]')?.classList.remove('active');
-    workspace.classList.remove('chat-open');
-    chatActionsMenu.classList.add('hidden');
+  chatHistoryToggle.addEventListener('click', toggleChatHistory);
+  chatHistory.querySelector('.chat-history-clear').addEventListener('click', (event) => {
+    event.stopPropagation();
+    chatSessions.length = 0;
+    activeChatSession = null;
+    renderChatThread(null);
+    chatThread.scrollTop = 0;
+    renderChatHistory();
   });
   const terminalPanel = editor.querySelector('[data-feature-panel="terminal"]');
   const terminalTabs = terminalPanel.querySelector('.terminal-tabs');
@@ -486,6 +597,7 @@ function setupWorkspaceControls(workspace) {
     terminalCaret.classList.toggle('is-hidden', document.activeElement !== terminalInput);
   };
   const focusTerminal = () => {
+    if (terminalPanel.classList.contains('hidden')) return;
     terminalInput.focus();
     terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
     updateTerminalCaret();
@@ -517,11 +629,13 @@ function setupWorkspaceControls(workspace) {
   const appendTerminalOutput = (session, data) => {
     session.output += data;
     if (session === activeTerminalSession) {
+      const wasFocused = document.activeElement === terminalScreen;
       terminalScreen.value = `${session.output}${session.inputBuffer}`;
       terminalScreen.scrollTop = terminalScreen.scrollHeight;
-      terminalScreen.focus();
-      terminalScreen.setSelectionRange(terminalScreen.value.length, terminalScreen.value.length);
-      updateTerminalCaret();
+      if (wasFocused) {
+        terminalScreen.setSelectionRange(terminalScreen.value.length, terminalScreen.value.length);
+        updateTerminalCaret();
+      }
     }
   };
   const createTerminalSession = async (tab) => {
@@ -534,7 +648,6 @@ function setupWorkspaceControls(workspace) {
       tab.querySelector('.terminal-tab-label').textContent = terminal.shell;
       if (session === activeTerminalSession) {
         terminalInput.disabled = false;
-        focusTerminal();
       }
     } catch (error) { appendTerminalOutput(session, `Erro ao iniciar terminal: ${error.message}\r\n`); }
     return session;
@@ -608,6 +721,9 @@ function setupWorkspaceControls(workspace) {
       return;
     }
     tab.remove();
+    activeTerminalSession = null;
+    terminalScreen.value = '';
+    terminalInput.value = '';
     terminalPanel.classList.add('hidden');
     workspace.querySelector('.top-action-button[title="Terminal"]')?.classList.remove('active');
     updateTerminalLimit();
@@ -684,10 +800,10 @@ function setupWorkspaceControls(workspace) {
       hideTerminalActionsMenu();
     }
   });
-  terminalPanel.querySelector('.terminal-new').addEventListener('click', () => {
-    if (terminalTabs.children.length >= 7) return;
+  const addTerminalTab = () => {
+    if (terminalTabs.children.length >= 7) return null;
     const usedNames = new Set([...terminalTabs.querySelectorAll('.terminal-tab-label')].map((label) => label.textContent));
-    let terminalNumber = 2;
+    let terminalNumber = terminalTabs.children.length ? 2 : 1;
     while (usedNames.has(`Terminal ${terminalNumber}`)) terminalNumber += 1;
     const tab = document.createElement('button');
     tab.className = 'terminal-tab';
@@ -697,6 +813,10 @@ function setupWorkspaceControls(workspace) {
     createTerminalSession(tab);
     activateTerminal(tab);
     updateTerminalLimit();
+    return tab;
+  };
+  terminalPanel.querySelector('.terminal-new').addEventListener('click', () => {
+    addTerminalTab();
   });
   terminalMaximize.addEventListener('click', () => {
     const maximized = terminalPanel.classList.toggle('is-maximized');
@@ -781,7 +901,14 @@ function setupWorkspaceControls(workspace) {
       if (panel) {
         panel.classList.toggle('hidden', isOpen);
         button.classList.toggle('active', !isOpen);
-        if (feature === 'terminal' && isOpen === false) focusTerminal();
+        if (feature === 'terminal' && isOpen === false) {
+          if (!terminalTabs.children.length) addTerminalTab();
+          focusTerminal();
+        }
+        if (feature === 'chat' && isOpen === false) {
+          chatMessageInput.focus();
+          setTimeout(() => chatMessageInput.focus(), 80);
+        }
       }
       workspace.querySelector('.editor-tabs').classList.toggle('preview-active', feature === 'preview' && !isOpen);
       workspace.classList.toggle('preview-open', feature === 'preview' && !isOpen);
