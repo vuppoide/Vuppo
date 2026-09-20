@@ -34,6 +34,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
 
@@ -102,6 +103,21 @@ app.whenReady().then(() => {
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Arquivo fora do projeto.');
     await fs.promises.writeFile(target, content, 'utf8');
     return true;
+  });
+  ipcMain.handle('create-file', async (_event, { projectPath, relativePath }) => {
+    const root = path.resolve(projectPath);
+    const target = path.resolve(root, relativePath);
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Arquivo fora do projeto.');
+    await fs.promises.mkdir(path.dirname(target), { recursive: true });
+    await fs.promises.writeFile(target, '', 'utf8');
+    return target;
+  });
+  ipcMain.handle('create-folder', async (_event, { projectPath, relativePath }) => {
+    const root = path.resolve(projectPath);
+    const target = path.resolve(root, relativePath);
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Pasta fora do projeto.');
+    await fs.promises.mkdir(target, { recursive: false });
+    return target;
   });
   ipcMain.handle('open-file', async (_event, filePath) => {
     await shell.openPath(filePath);

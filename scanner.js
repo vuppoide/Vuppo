@@ -43,8 +43,11 @@ function scanProject(projectPath) {
     const mime = IMAGE_MIMES.get(path.extname(filePath).toLowerCase());
     try {
       const stats = fs.statSync(filePath);
-      content = mime ? '' : stats.size <= 2 * 1024 * 1024 ? fs.readFileSync(filePath, 'utf8') : '';
-      if (mime && stats.size <= 5 * 1024 * 1024) content = `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`;
+      if (mime) {
+        content = stats.size <= 5 * 1024 * 1024 ? `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}` : '';
+      } else {
+        content = fs.readFileSync(filePath, 'utf8');
+      }
     } catch { content = ''; }
     scannedFiles.push({ file: path.relative(projectPath, filePath), absoluteFile: filePath, content, mime, isImage: Boolean(mime) });
   }

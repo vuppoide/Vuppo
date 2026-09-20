@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('vuppo', {
     return () => { ipcRenderer.removeListener('terminal-data', listener); ipcRenderer.removeListener('terminal-exit', listener); };
   },
   writeFile: (fileData) => ipcRenderer.invoke('write-file', fileData),
+  createFile: (params) => ipcRenderer.invoke('create-file', params),
+  createFolder: (params) => ipcRenderer.invoke('create-folder', params),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window-toggle-maximize'),

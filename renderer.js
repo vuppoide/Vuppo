@@ -181,6 +181,8 @@ function renderReport() {
     workspace.innerHTML = `<header class="workspace-topbar"><div class="workspace-brand"><span class="workspace-logo">V</span><strong>Vuppo</strong><span class="workspace-separator">/</span><span>${escapeHtml(currentReport.projectName)}</span></div><nav class="workspace-top-actions" aria-label="Ações do editor"><button class="top-action-button active" type="button" title="Preview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h5M8 16h3"/></svg><span>Preview</span></button><button class="top-action-button" type="button" title="Terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg><span>Terminal</span></button><button class="top-action-button" type="button" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/></svg><span>Chat</span></button><button class="profile-button" type="button" title="Perfil" aria-label="Perfil"><span>U</span></button></nav></header><div class="workspace-body"><nav class="workspace-activity" aria-label="Navegação do projeto"><button class="activity-button active" title="Explorador de arquivos" aria-label="Explorador de arquivos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg></button><button class="activity-button" title="Git" aria-label="Git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg></button><button class="activity-button" title="Extensões" aria-label="Extensões"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4h4v2H3v4a2 2 0 0 0 2 2h4v-4h2v4h4a2 2 2 0 0 0 2-2v-4h-4V9h4V5a2 2 0 0 0-2-2h-4v4H9V3Z"/></svg></button><button class="activity-button" title="Security Problems" aria-label="Security Problems"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 7v5c0 4.8-3.2 7.7-9 9-5.8-1.3-9-4.2-9-9V7l9-4Z"/><path d="M12 8v4M12 16h.01"/></svg></button><span></span><button class="activity-button" id="workspace-settings" title="Configurações" aria-label="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button></nav>
   </div></div>`;
   workspace.querySelector('.workspace-body').insertAdjacentHTML('beforeend', `<aside class="workspace-sidebar"><div class="sidebar-title">EXPLORER <span>${currentReport.filesScanned}</span></div><section class="explorer-open-editors"><div class="explorer-section-heading">OPEN EDITORS</div><button class="open-editor-item" type="button"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</button></section><div class="file-tree"><div class="tree-folder">${escapeHtml(currentReport.projectName)}</div>${(files.length ? files : [{ file: 'Nenhum arquivo encontrado' }]).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}"><span class="file-dot"></span>${escapeHtml(file.file)}</button>`).join('')}</div><div class="sidebar-bottom"><span>ANALISE</span><strong>${currentReport.findings.length} achados</strong><small>${currentReport.durationMs} ms · ${currentReport.filesScanned} arquivos</small></div></aside><main class="workspace-editor"><div class="editor-tabs"><span class="editor-tab active"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</span></div><div class="editor-content"><div class="line-numbers">${Array.from({ length: Math.max(12, firstFinding ? firstFinding.line + 4 : 12) }, (_, index) => `<span>${index + 1}</span>`).join('')}</div><pre class="code-preview"><code>${escapeHtml(firstFinding ? firstFinding.excerpt : (files[0]?.content || '// Nenhum arquivo encontrado.'))}</code></pre></div><div class="editor-panel-label">PROBLEMS <span>${currentReport.findings.length}</span></div></main><aside class="security-panel"><div class="security-heading"><div><span class="panel-eyebrow">VUPPO SECURITY</span><h2>Security Problems</h2></div><span class="finding-total">${currentReport.findings.length}</span></div><div class="severity-summary"><span><b class="severity-critical">${counts.critical || 0}</b> critical</span><span><b class="severity-high">${counts.high || 0}</b> high</span><span><b class="severity-medium">${counts.medium || 0}</b> medium</span></div><div class="workspace-findings">${currentReport.findings.length ? currentReport.findings.map((finding, index) => `<button class="workspace-finding ${index === 0 ? 'selected' : ''}" data-finding-index="${index}"><span class="finding-severity ${finding.severity}"></span><span><strong>${escapeHtml(finding.title)}</strong><small>${escapeHtml(finding.file)}:${finding.line}</small></span></button>`).join('') : '<div class="workspace-empty-state">Nenhum risco encontrado pelas regras atuais.</div>'}</div></aside><footer class="workspace-statusbar"><span>main</span><span>${escapeHtml(currentReport.projectPath)}</span><span>${currentReport.scannedAt.slice(0, 10)} · ${currentReport.filesScanned} arquivos</span></footer>`);
+  workspace.querySelector('.editor-tabs').innerHTML = '';
+  workspace.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
   const fileTree = workspace.querySelector('.file-tree');
   if (files.length) {
     const treeRoot = { folders: new Map(), files: [] };
@@ -197,7 +199,7 @@ function renderReport() {
     fileTree.innerHTML = `<div class="tree-folder"><span class="tree-chevron">⌄</span><img src="assets/material-icons/folder-open.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(currentReport.projectName)}</span></div><div class="tree-children root-children">${renderTreeNode(treeRoot)}</div>`;
   }
   const explorerTitle = workspace.querySelector('.sidebar-title');
-  explorerTitle.innerHTML = '<span>EXPLORER</span><div class="explorer-actions"><button type="button" class="explorer-collapse" title="Recolher todas as pastas" aria-label="Recolher todas as pastas">⌃</button><button type="button" title="Mais ações" aria-label="Mais ações">...</button></div>';
+  explorerTitle.innerHTML = '<span>EXPLORER</span><div class="explorer-actions"><button type="button" class="explorer-more" title="Mais ações" aria-label="Mais ações" aria-expanded="false">...</button><div class="explorer-menu hidden"><button type="button" data-explorer-action="collapse">Recolher pasta</button><button type="button" data-explorer-action="new-folder">Nova pasta</button><button type="button" data-explorer-action="new-file">Novo arquivo</button></div></div>';
   const explorerFolder = workspace.querySelector('.tree-folder');
   explorerFolder.innerHTML = `<span class="tree-chevron">⌄</span><img src="assets/material-icons/folder-open.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(currentReport.projectName)}</span>`;
   workspace.querySelectorAll('.tree-file').forEach((button) => {
@@ -209,13 +211,43 @@ function renderReport() {
     explorerFolder.querySelector('.tree-chevron').textContent = collapsed ? '›' : '⌄';
     fileTree.querySelector('.root-children')?.classList.toggle('collapsed', collapsed);
   });
-  explorerTitle.querySelector('.explorer-collapse')?.addEventListener('click', (event) => {
+  const explorerMenu = explorerTitle.querySelector('.explorer-menu');
+  explorerTitle.querySelector('.explorer-more')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const isHidden = explorerMenu.classList.toggle('hidden');
+    event.currentTarget.setAttribute('aria-expanded', String(!isHidden));
+  });
+  explorerMenu?.querySelector('[data-explorer-action="collapse"]')?.addEventListener('click', (event) => {
     event.stopPropagation();
     workspace.querySelectorAll('.tree-folder-item').forEach((folder) => {
       folder.classList.add('collapsed');
       folder.querySelector('.tree-chevron').textContent = '›';
       folder.nextElementSibling?.classList.add('collapsed');
     });
+    explorerMenu.classList.add('hidden');
+    explorerTitle.querySelector('.explorer-more')?.setAttribute('aria-expanded', 'false');
+  });
+  explorerMenu?.querySelector('[data-explorer-action="new-folder"]')?.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    const relativePath = window.prompt('Nome da nova pasta:');
+    if (!relativePath?.trim()) return;
+    try {
+      await window.vuppo.createFolder({ projectPath: currentReport.projectPath, relativePath: relativePath.trim() });
+      await analyzeProject(currentReport.projectPath);
+    } catch (error) {
+      alert(error.message || 'Não foi possível criar a pasta.');
+    }
+  });
+  explorerMenu?.querySelector('[data-explorer-action="new-file"]')?.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    const relativePath = window.prompt('Nome do novo arquivo:');
+    if (!relativePath?.trim()) return;
+    try {
+      await window.vuppo.createFile({ projectPath: currentReport.projectPath, relativePath: relativePath.trim() });
+      await analyzeProject(currentReport.projectPath);
+    } catch (error) {
+      alert(error.message || 'Não foi possível criar o arquivo.');
+    }
   });
   workspace.querySelectorAll('.tree-folder-item').forEach((folder) => folder.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -239,8 +271,29 @@ function renderReport() {
   workspace.querySelector('.open-editors-menu-button')?.addEventListener('click', (event) => { event.stopPropagation(); openEditorsMenu.classList.toggle('hidden'); });
   openEditorsMenu?.querySelector('[data-open-editor-action="close"]')?.addEventListener('click', closeActiveEditor);
   openEditorsMenu?.querySelector('[data-open-editor-action="close-all"]')?.addEventListener('click', closeActiveEditor);
-  selectWorkspaceFile(firstFinding?.file || files[0]?.file);
   $('#workspace-close').addEventListener('click', () => { workspace.classList.add('hidden'); $('#dashboard-empty').classList.remove('hidden'); $('#app-shell').classList.add('home-mode'); });
+}
+
+function resolveProjectPreviewUrl() {
+  if (!currentReport?.projectPath) return 'http://localhost:3000';
+  const indexFile = currentReport.files?.find((file) => {
+    const normalized = file.file.replace(/\\/g, '/').toLowerCase();
+    return normalized === 'index.html' || normalized.endsWith('/index.html') || normalized === 'src/index.html' || normalized === 'public/index.html';
+  });
+  if (indexFile?.absoluteFile) {
+    const normalized = indexFile.absoluteFile.replace(/\\/g, '/');
+    return normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`;
+  }
+  return 'http://localhost:3000';
+}
+
+function updateEditorTabsMenuVisibility() {
+  const editorTabs = document.querySelector('.editor-tabs');
+  const actions = editorTabs?.querySelector('.editor-tabs-actions');
+  if (!editorTabs || !actions) return;
+  const hasTabs = editorTabs.querySelectorAll('.editor-tab').length > 0;
+  actions.classList.toggle('hidden', !hasTabs);
+  if (!hasTabs) actions.querySelector('.editor-tabs-menu')?.classList.add('hidden');
 }
 
 function setupWorkspaceControls(workspace) {
@@ -252,9 +305,10 @@ function setupWorkspaceControls(workspace) {
   const editorTab = workspace.querySelector('.editor-tab');
   const openEditorName = openEditor?.textContent.trim() || '';
   if (openEditor) openEditor.innerHTML = `<i></i><span class="open-editor-name">${escapeHtml(openEditorName)}</span><span class="open-editor-close" title="Fechar editor" aria-label="Fechar editor">×</span>`;
-  if (editorTab) editorTab.innerHTML = `<i></i><span class="editor-tab-name">${escapeHtml(editorTab.textContent.trim())}</span><button class="editor-tab-close" type="button" title="Fechar editor" aria-label="Fechar editor">×</button>`;
+  if (editorTab) editorTab.innerHTML = `<span class="editor-tab-icon"></span><span class="editor-tab-name">${escapeHtml(editorTab.textContent.trim())}</span><button class="editor-tab-close" type="button" title="Fechar editor" aria-label="Fechar editor">×</button>`;
   const editorTabs = workspace.querySelector('.editor-tabs');
   editorTabs?.insertAdjacentHTML('beforeend', '<div class="editor-tabs-actions"><button class="editor-tabs-menu-button" type="button" title="Mais ações" aria-label="Mais ações">...</button><div class="editor-tabs-menu hidden"><button type="button" data-editor-action="save">Salvar</button><button type="button" data-editor-action="close">Fechar editor</button><button type="button" data-editor-action="close-all">Fechar todos</button></div></div>');
+  updateEditorTabsMenuVisibility();
   editorTabs?.addEventListener('click', (event) => {
     const menuButton = event.target.closest('.editor-tabs-menu-button');
     if (menuButton) {
@@ -312,8 +366,35 @@ function setupWorkspaceControls(workspace) {
   sidebar.insertAdjacentHTML('beforeend', sideViews.git + sideViews.extensions + sideViews.settings);
   editor.insertAdjacentHTML('beforeend', '<section class="workspace-feature-panel preview-panel hidden" data-feature-panel="preview"><div class="preview-browser-bar"><button type="button" class="preview-target">▣ <span>Desktop</span>⌄</button><div class="preview-url"><span>◉</span>http://localhost:3000</div><button type="button" aria-label="Atualizar preview">↻</button><button type="button" aria-label="Abrir preview em nova janela">↗</button><button type="button" class="feature-close" aria-label="Fechar Preview">×</button></div><div class="preview-empty"><div class="preview-browser-icon"><i></i><i></i><i></i><span></span></div><strong>No preview available</strong><span>Run your project to see the preview here.</span></div></section><section class="workspace-feature-panel terminal-panel hidden" data-feature-panel="terminal"><div class="terminal-heading"><div class="terminal-tabs"><button class="terminal-tab active" type="button">powershell</button></div><div class="terminal-controls"><button type="button" class="terminal-control terminal-new" title="Novo terminal" aria-label="Novo terminal">+</button><button type="button" class="terminal-control terminal-maximize" title="Maximizar terminal" aria-label="Maximizar terminal">□</button><button type="button" class="terminal-control terminal-trash" title="Fechar terminal" aria-label="Fechar terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg></button></div></div><div class="terminal-output"><span class="terminal-prompt">PS Vuppo&gt;</span><span class="terminal-cursor"></span></div></section><section class="workspace-feature-panel chat-panel hidden" data-feature-panel="chat"><header class="chat-heading"><div class="chat-title"><span class="chat-agent-icon">V</span><strong>Vuppo Chat</strong><span class="chat-status-dot"></span></div><div class="chat-heading-actions"><button type="button" class="chat-heading-button" title="Novo chat" aria-label="Novo chat">+</button><button type="button" class="feature-close" aria-label="Fechar Chat">Fechar</button></div></header><div class="chat-thread"><div class="chat-welcome"><span class="chat-welcome-icon">V</span><strong>Como posso ajudar?</strong><p>Analise o código, explique um achado ou sugira uma correção.</p></div></div><div class="chat-composer"><div class="chat-input"><span>Mensagem para Vuppo...</span><b>↑</b></div><div class="chat-composer-footer"><button type="button" class="chat-model">Vuppo Security <span>⌄</span></button><span class="chat-shortcut">Enter para enviar</span></div></div></section>');
   const previewPanel = editor.querySelector('[data-feature-panel="preview"]');
+  const previewUrl = resolveProjectPreviewUrl();
+  const previewPlaceholder = previewPanel.querySelector('.preview-empty');
   previewPanel.querySelector('.preview-target').innerHTML = '<span class="desktop-icon">▣</span><span>Desktop</span><b>⌄</b>';
-  previewPanel.querySelector('.preview-url span').className = 'globe-icon';
+  previewPanel.querySelector('.preview-url').innerHTML = `<span class="globe-icon"></span><span class="preview-url-text">${previewUrl}</span>`;
+  let previewWebview = previewPanel.querySelector('webview');
+  if (!previewWebview) {
+    previewWebview = document.createElement('webview');
+    previewWebview.className = 'preview-webview';
+    previewWebview.setAttribute('allowpopups', 'true');
+    previewWebview.setAttribute('partition', 'persist:vuppo-preview');
+    previewPanel.appendChild(previewWebview);
+  }
+  previewWebview.setAttribute('src', previewUrl);
+  previewWebview.addEventListener('did-finish-load', () => {
+    previewPlaceholder?.classList.add('hidden');
+  });
+  previewWebview.addEventListener('did-fail-load', () => {
+    previewPlaceholder?.classList.remove('hidden');
+    const title = previewPlaceholder?.querySelector('strong');
+    const text = previewPlaceholder?.querySelector('span');
+    if (title) title.textContent = 'Preview indisponível';
+    if (text) text.textContent = 'Inicie o projeto em http://localhost:3000 para visualizar a página.';
+  });
+  previewPanel.querySelector('[aria-label="Atualizar preview"]')?.addEventListener('click', () => {
+    previewWebview.reload();
+  });
+  previewPanel.querySelector('[aria-label="Abrir preview em nova janela"]')?.addEventListener('click', () => {
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+  });
   const chatPanel = editor.querySelector('[data-feature-panel="chat"]');
   chatPanel.querySelector('.chat-title strong').textContent = 'Chat';
   chatPanel.querySelector('.chat-agent-icon')?.remove();
@@ -376,12 +457,45 @@ function setupWorkspaceControls(workspace) {
   const terminalPanel = editor.querySelector('[data-feature-panel="terminal"]');
   const terminalTabs = terminalPanel.querySelector('.terminal-tabs');
   terminalTabs.querySelector('.terminal-tab').innerHTML = '<span class="terminal-tab-label">Terminal</span><span class="terminal-tab-close" role="button" aria-label="Remover sessão">×</span>';
+  const terminalActionsMenu = document.createElement('div');
+  terminalActionsMenu.className = 'terminal-actions-menu hidden';
+  terminalActionsMenu.innerHTML = '<button type="button" data-terminal-action="clear">Limpar terminal</button><button type="button" data-terminal-action="close">Fechar Terminal</button>';
+  terminalPanel.appendChild(terminalActionsMenu);
   const terminalOutput = terminalPanel.querySelector('.terminal-output');
-  terminalOutput.innerHTML = '<textarea class="terminal-screen" aria-label="Terminal" spellcheck="false"></textarea>';
+  terminalOutput.innerHTML = '<textarea class="terminal-screen" aria-label="Terminal" spellcheck="false"></textarea><span class="terminal-block-caret" aria-hidden="true"></span>';
   const terminalScreen = terminalPanel.querySelector('.terminal-screen');
+  const terminalCaret = terminalPanel.querySelector('.terminal-block-caret');
   const terminalInput = terminalScreen;
   const terminalSessions = new Map();
   let activeTerminalSession = null;
+  const updateTerminalCaret = () => {
+    const styles = window.getComputedStyle(terminalInput);
+    const textBeforeCaret = terminalInput.value.slice(0, terminalInput.selectionStart ?? terminalInput.value.length);
+    const lines = textBeforeCaret.split('\n');
+    const fontSize = parseFloat(styles.fontSize) || 12;
+    const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.6;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = styles.font;
+    const textWidth = context.measureText(lines[lines.length - 1]).width;
+    const left = terminalInput.offsetLeft + (parseFloat(styles.paddingLeft) || 0) + textWidth;
+    const top = terminalInput.offsetTop + (parseFloat(styles.paddingTop) || 0) + (lines.length - 1) * lineHeight - terminalInput.scrollTop;
+    terminalCaret.style.left = `${Math.max(0, left)}px`;
+    terminalCaret.style.top = `${Math.max(0, top)}px`;
+    terminalCaret.style.height = `${lineHeight}px`;
+    terminalCaret.classList.toggle('is-hidden', document.activeElement !== terminalInput);
+  };
+  const focusTerminal = () => {
+    terminalInput.focus();
+    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+    updateTerminalCaret();
+  };
+  const renderTerminalInput = () => {
+    if (!activeTerminalSession) return;
+    terminalInput.value = `${activeTerminalSession.output}${activeTerminalSession.inputBuffer}`;
+    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+    updateTerminalCaret();
+  };
   const terminalMaximize = terminalPanel.querySelector('.terminal-maximize');
   const activateTerminal = (tab) => {
     terminalTabs.querySelectorAll('.terminal-tab').forEach((item) => item.classList.toggle('active', item === tab));
@@ -389,8 +503,16 @@ function setupWorkspaceControls(workspace) {
     terminalScreen.value = activeTerminalSession ? `${activeTerminalSession.output}${activeTerminalSession.inputBuffer}` : '';
     terminalScreen.scrollTop = terminalScreen.scrollHeight;
     terminalInput.disabled = false;
-    terminalInput.focus();
-    terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+    focusTerminal();
+  };
+  const restoreTerminalInput = () => {
+    if (!activeTerminalSession) return;
+    const output = activeTerminalSession.output;
+    const typedText = terminalInput.value.startsWith(output)
+      ? terminalInput.value.slice(output.length)
+      : activeTerminalSession.inputBuffer;
+    activeTerminalSession.inputBuffer = typedText;
+    renderTerminalInput();
   };
   const appendTerminalOutput = (session, data) => {
     session.output += data;
@@ -399,6 +521,7 @@ function setupWorkspaceControls(workspace) {
       terminalScreen.scrollTop = terminalScreen.scrollHeight;
       terminalScreen.focus();
       terminalScreen.setSelectionRange(terminalScreen.value.length, terminalScreen.value.length);
+      updateTerminalCaret();
     }
   };
   const createTerminalSession = async (tab) => {
@@ -409,7 +532,10 @@ function setupWorkspaceControls(workspace) {
       const terminal = await window.vuppo.createTerminal(currentReport.projectPath);
       session.id = terminal.id;
       tab.querySelector('.terminal-tab-label').textContent = terminal.shell;
-      if (session === activeTerminalSession) terminalInput.disabled = false;
+      if (session === activeTerminalSession) {
+        terminalInput.disabled = false;
+        focusTerminal();
+      }
     } catch (error) { appendTerminalOutput(session, `Erro ao iniciar terminal: ${error.message}\r\n`); }
     return session;
   };
@@ -418,8 +544,11 @@ function setupWorkspaceControls(workspace) {
     if (session) appendTerminalOutput(session, payload.data || '');
   });
   terminalInput.addEventListener('input', () => {
-    if (activeTerminalSession) activeTerminalSession.inputBuffer = terminalInput.value.slice(activeTerminalSession.output.length);
+    restoreTerminalInput();
   });
+  terminalInput.addEventListener('scroll', updateTerminalCaret);
+  terminalInput.addEventListener('select', updateTerminalCaret);
+  terminalInput.addEventListener('blur', updateTerminalCaret);
   const sendTerminalInput = async () => {
     if (!activeTerminalSession?.id) return;
     const input = activeTerminalSession.inputBuffer;
@@ -428,35 +557,37 @@ function setupWorkspaceControls(workspace) {
     activeTerminalSession.inputBuffer = '';
     terminalInput.value = activeTerminalSession.output;
     terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+    updateTerminalCaret();
   };
-  terminalInput.addEventListener('keydown', async (event) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    await sendTerminalInput();
-  });
   terminalPanel.addEventListener('keydown', async (event) => {
-    if (event.target === terminalInput) return;
+    if (event.target !== terminalInput && event.target.closest('button')) return;
     if (event.key === 'Enter') {
       event.preventDefault();
       await sendTerminalInput();
-      terminalInput.focus();
+      focusTerminal();
       return;
     }
     if (event.key === 'Backspace') {
       event.preventDefault();
-      terminalInput.value = terminalInput.value.slice(0, -1);
-      terminalInput.focus();
+      if (activeTerminalSession?.inputBuffer) {
+        activeTerminalSession.inputBuffer = activeTerminalSession.inputBuffer.slice(0, -1);
+        renderTerminalInput();
+      }
+      focusTerminal();
       return;
     }
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
-      terminalInput.value += event.key;
-      terminalInput.focus();
+      if (!activeTerminalSession) return;
+      activeTerminalSession.inputBuffer += event.key;
+      renderTerminalInput();
+      focusTerminal();
     }
   });
   terminalScreen.addEventListener('click', () => {
     terminalInput.focus();
     terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+    updateTerminalCaret();
   });
   const updateTerminalLimit = () => {
     const newTerminalButton = terminalPanel.querySelector('.terminal-new');
@@ -464,24 +595,94 @@ function setupWorkspaceControls(workspace) {
     newTerminalButton.disabled = limitReached;
     newTerminalButton.title = limitReached ? 'Limite de 7 sessões atingido' : 'Novo terminal';
   };
+  const closeTerminalTab = (tab) => {
+    if (!tab) return;
+    const session = terminalSessions.get(tab);
+    if (session?.id) window.vuppo.killTerminal(session.id);
+    terminalSessions.delete(tab);
+    if (terminalTabs.children.length > 1) {
+      const nextTab = tab.nextElementSibling || tab.previousElementSibling;
+      tab.remove();
+      activateTerminal(nextTab);
+      updateTerminalLimit();
+      return;
+    }
+    tab.remove();
+    terminalPanel.classList.add('hidden');
+    workspace.querySelector('.top-action-button[title="Terminal"]')?.classList.remove('active');
+    updateTerminalLimit();
+  };
+  const clearTerminalSession = async (session) => {
+    if (!session) return;
+    if (session.id) {
+      const clearCommand = process.platform === 'win32' ? 'cls\r' : 'clear\r';
+      await window.vuppo.writeTerminal(session.id, clearCommand);
+    }
+    session.output = '';
+    session.inputBuffer = '';
+    if (session === activeTerminalSession) {
+      terminalScreen.value = '';
+      terminalInput.value = '';
+      terminalInput.setSelectionRange(0, 0);
+    }
+    updateTerminalCaret();
+  };
+  const hideTerminalActionsMenu = () => terminalActionsMenu.classList.add('hidden');
+  const showTerminalActionsMenu = (tab, event) => {
+    if (!tab) return;
+    activateTerminal(tab);
+    const isHidden = terminalActionsMenu.classList.contains('hidden');
+    if (isHidden) {
+      const bounds = tab.getBoundingClientRect();
+      terminalActionsMenu.style.top = `${bounds.bottom + 4}px`;
+      terminalActionsMenu.style.left = `${Math.max(10, bounds.left)}px`;
+      terminalActionsMenu.classList.remove('hidden');
+    } else {
+      hideTerminalActionsMenu();
+    }
+    event?.stopPropagation();
+  };
+  terminalActionsMenu.querySelector('[data-terminal-action="clear"]').addEventListener('click', async () => {
+    const activeTab = terminalTabs.querySelector('.terminal-tab.active');
+    await clearTerminalSession(terminalSessions.get(activeTab));
+    hideTerminalActionsMenu();
+    terminalInput.focus();
+    updateTerminalCaret();
+  });
+  terminalActionsMenu.querySelector('[data-terminal-action="close"]').addEventListener('click', () => {
+    const activeTab = terminalTabs.querySelector('.terminal-tab.active');
+    closeTerminalTab(activeTab);
+    hideTerminalActionsMenu();
+  });
   terminalTabs.addEventListener('click', (event) => {
     const close = event.target.closest('.terminal-tab-close');
     if (close) {
       const tab = close.closest('.terminal-tab');
-      const session = terminalSessions.get(tab);
-      if (session?.id) window.vuppo.killTerminal(session.id);
-      terminalSessions.delete(tab);
-      if (terminalTabs.children.length > 1) {
-        const nextTab = tab.nextElementSibling || tab.previousElementSibling;
-        tab.remove();
-        activateTerminal(nextTab);
-        updateTerminalLimit();
-      }
+      closeTerminalTab(tab);
+      hideTerminalActionsMenu();
       event.stopPropagation();
       return;
     }
     const tab = event.target.closest('.terminal-tab');
+    if (tab && event.button === 2) {
+      showTerminalActionsMenu(tab, event);
+      return;
+    }
     if (tab) activateTerminal(tab);
+  });
+  document.addEventListener('contextmenu', (event) => {
+    const targetTab = event.target.closest('.terminal-tab');
+    if (!targetTab) {
+      hideTerminalActionsMenu();
+      return;
+    }
+    event.preventDefault();
+    showTerminalActionsMenu(targetTab, event);
+  });
+  document.addEventListener('click', (event) => {
+    if (!terminalActionsMenu.contains(event.target) && !event.target.closest('.terminal-tab')) {
+      hideTerminalActionsMenu();
+    }
   });
   terminalPanel.querySelector('.terminal-new').addEventListener('click', () => {
     if (terminalTabs.children.length >= 7) return;
@@ -505,18 +706,8 @@ function setupWorkspaceControls(workspace) {
   });
   terminalPanel.querySelector('.terminal-trash').addEventListener('click', () => {
     const activeTab = terminalTabs.querySelector('.terminal-tab.active');
-    const activeSession = terminalSessions.get(activeTab);
-    if (activeSession?.id) window.vuppo.killTerminal(activeSession.id);
-    terminalSessions.delete(activeTab);
-    if (terminalTabs.children.length > 1) {
-      const nextTab = activeTab.nextElementSibling || activeTab.previousElementSibling;
-      activeTab.remove();
-      activateTerminal(nextTab);
-      updateTerminalLimit();
-      return;
-    }
-    terminalPanel.classList.add('hidden');
-    workspace.querySelector('.top-action-button[title="Terminal"]')?.classList.remove('active');
+    closeTerminalTab(activeTab);
+    hideTerminalActionsMenu();
   });
   const initialTerminalTab = terminalTabs.querySelector('.terminal-tab');
   terminalSessions.set(initialTerminalTab, { tab: initialTerminalTab, id: null, output: '', inputBuffer: '' });
@@ -590,7 +781,7 @@ function setupWorkspaceControls(workspace) {
       if (panel) {
         panel.classList.toggle('hidden', isOpen);
         button.classList.toggle('active', !isOpen);
-        if (feature === 'terminal' && isOpen === false) panel.querySelector('.terminal-input')?.focus();
+        if (feature === 'terminal' && isOpen === false) focusTerminal();
       }
       workspace.querySelector('.editor-tabs').classList.toggle('preview-active', feature === 'preview' && !isOpen);
       workspace.classList.toggle('preview-open', feature === 'preview' && !isOpen);
@@ -617,10 +808,12 @@ function setupWorkspaceControls(workspace) {
   const profileMenu = workspace.querySelector('.profile-menu');
   const maximizeButton = workspace.querySelector('[data-window-action="maximize"]');
   const setWindowState = (isMaximized) => {
-    const icon = maximizeButton.querySelector('.window-icon');
-    icon.className = `window-icon ${isMaximized ? 'restore-icon' : 'maximize-icon'}`;
-    maximizeButton.title = isMaximized ? 'Restaurar' : 'Maximizar';
-    maximizeButton.setAttribute('aria-label', maximizeButton.title);
+    const icon = maximizeButton?.querySelector('.window-icon');
+    if (icon) {
+      icon.className = 'window-icon maximize-icon';
+    }
+    maximizeButton.title = 'Maximizar';
+    maximizeButton.setAttribute('aria-label', 'Maximizar');
   };
   workspace.querySelector('[data-window-action="minimize"]').addEventListener('click', () => window.vuppo.minimizeWindow());
   let windowStateRequest = 0;
@@ -669,17 +862,21 @@ function openWorkspaceTab(file) {
   if (!tab) {
     tab = document.createElement('span');
     tab.className = 'editor-tab';
-    tab.innerHTML = '<i></i><span class="editor-tab-name"></span><button class="editor-tab-close" type="button" title="Fechar editor" aria-label="Fechar editor">×</button>';
-    tabs.appendChild(tab);
+    tab.innerHTML = '<span class="editor-tab-icon"></span><span class="editor-tab-name"></span><button class="editor-tab-close" type="button" title="Fechar editor" aria-label="Fechar editor">×</button>';
+    const tabsActions = tabs.querySelector('.editor-tabs-actions');
+    if (tabsActions) tabs.insertBefore(tab, tabsActions);
+    else tabs.appendChild(tab);
   }
   updateEditorLabels(tab, file);
   tabs.querySelectorAll('.editor-tab').forEach((item) => item.classList.toggle('active', item === tab));
+  updateEditorTabsMenuVisibility();
   tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 }
 
 function updateEditorLabels(tab, file) {
   const name = file.split(/[\\/]/).pop();
   tab.dataset.file = file;
+  tab.querySelector('.editor-tab-icon').innerHTML = fileIconMarkup(name);
   tab.querySelector('.editor-tab-name').textContent = name;
   const openEditor = document.querySelector('.open-editor-item');
   if (openEditor) {
@@ -695,10 +892,11 @@ function closeEditorTab(file) {
   if (!tab) return;
   const wasActive = tab.classList.contains('active');
   tab.remove();
+  updateEditorTabsMenuVisibility();
   if (!wasActive) return;
   const nextTab = tabs.querySelector('.editor-tab:last-child');
   if (nextTab) selectWorkspaceFile(nextTab.dataset.file);
-  else document.querySelector('.editor-content').innerHTML = '<div class="editor-empty">Nenhum editor aberto</div>';
+  else document.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
 }
 
 function closeActiveEditor() {
@@ -717,11 +915,12 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
     return;
   }
   const content = fileData.content ?? fallbackText ?? '// Arquivo sem conteúdo legível.';
-  const lineCount = content.split(/\r?\n/).length;
+  const safeContent = typeof content === 'string' && content.trim().length > 0 ? content : (fallbackText || '// Arquivo vazio ou não legível.');
+  const lineCount = safeContent.split(/\r?\n/).length;
   editorContent.innerHTML = `<div class="line-numbers">${Array.from({ length: Math.max(12, findingLine || lineCount, lineCount) }, (_, line) => `<span>${line + 1}</span>`).join('')}</div><div class="code-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editor de código" spellcheck="false"></div>`;
   const codeEditor = editorContent.querySelector('.code-editor');
   const lineNumbers = editorContent.querySelector('.line-numbers');
-  codeEditor.textContent = content;
+  codeEditor.textContent = safeContent;
   codeEditor.tabIndex = 0;
   codeEditor.focus();
   codeEditor.addEventListener('scroll', () => {
