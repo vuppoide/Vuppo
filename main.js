@@ -2,7 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron')
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { scanProject } = require('./scanner');
+const { scanProject, IMAGE_MIMES } = require('./scanner');
 const { createAuthStore } = require('./auth');
 
 function isWindowExpanded(window) {
@@ -108,6 +108,7 @@ app.whenReady().then(() => {
     const root = path.resolve(projectPath);
     const target = path.resolve(root, relativePath);
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Arquivo fora do projeto.');
+    if (fs.existsSync(target)) throw new Error('Já existe um arquivo com esse nome.');
     await fs.promises.mkdir(path.dirname(target), { recursive: true });
     await fs.promises.writeFile(target, '', 'utf8');
     return target;
@@ -116,11 +117,45 @@ app.whenReady().then(() => {
     const root = path.resolve(projectPath);
     const target = path.resolve(root, relativePath);
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Pasta fora do projeto.');
-    await fs.promises.mkdir(target, { recursive: false });
+    if (fs.existsSync(target)) throw new Error('Já existe uma pasta com esse nome.');
+    await fs.promises.mkdir(target, { recursive: true });
     return target;
+  });
+  ipcMain.handle('open-file-dialog', async () => {
+    const result = await dialog.showOpenDialog({ title: 'Abrir arquivo', properties: ['openFile'] });
+    if (result.canceled || !result.filePaths.length) return null;
+    const filePath = result.filePaths[0];
+    const mime = IMAGE_MIMES.get(path.extname(filePath).toLowerCase());
+    let content = '';
+    try {
+      const stats = await fs.promises.stat(filePath);
+      if (mime) {
+        content = stats.size <= 5 * 1024 * 1024 ? `data:${mime};base64,${(await fs.promises.readFile(filePath)).toString('base64')}` : '';
+      } else {
+        content = await fs.promises.readFile(filePath, 'utf8');
+      }
+    } catch {
+      throw new Error('Não foi possível ler o arquivo selecionado.');
+    }
+    return { filePath, name: path.basename(filePath), content, mime, isImage: Boolean(mime) };
+  });
+  ipcMain.handle('save-file-as', async (_event, { defaultPath, content }) => {
+    const result = await dialog.showSaveDialog({ title: 'Salvar como', defaultPath });
+    if (result.canceled || !result.filePath) return null;
+    await fs.promises.writeFile(result.filePath, content, 'utf8');
+    return result.filePath;
+  });
+  ipcMain.handle('write-file-path', async (_event, { filePath, content }) => {
+    if (!filePath) throw new Error('Caminho do arquivo inválido.');
+    await fs.promises.writeFile(path.resolve(filePath), content, 'utf8');
+    return true;
   });
   ipcMain.handle('open-file', async (_event, filePath) => {
     await shell.openPath(filePath);
+  });
+  ipcMain.handle('window-new', () => {
+    createWindow();
+    return true;
   });
   ipcMain.handle('window-minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize());
   ipcMain.handle('window-toggle-maximize', (event) => {

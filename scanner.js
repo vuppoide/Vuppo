@@ -27,6 +27,20 @@ function collectFiles(root, files = []) {
   return files;
 }
 
+function collectDirectories(root) {
+  const directories = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (IGNORED.has(entry.name) || !entry.isDirectory()) continue;
+      const fullPath = path.join(current, entry.name);
+      directories.push(path.relative(root, fullPath));
+      walk(fullPath);
+    }
+  };
+  walk(root);
+  return directories;
+}
+
 function isTextFile(filePath) {
   return EXTENSIONS.has(path.extname(filePath).toLowerCase()) || path.basename(filePath) === '.env';
 }
@@ -35,6 +49,7 @@ function scanProject(projectPath) {
   if (!projectPath || !fs.existsSync(projectPath)) throw new Error('Pasta do projeto não encontrada.');
   const started = Date.now();
   const files = collectFiles(projectPath);
+  const directories = collectDirectories(projectPath);
   const scannedFiles = [];
   const findings = [];
   const scanFiles = files.filter(isTextFile);
@@ -66,7 +81,7 @@ function scanProject(projectPath) {
   }
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || a.file.localeCompare(b.file));
-  return { projectPath, projectName: path.basename(projectPath), filesScanned: scannedFiles.length, analyzedFiles: scanFiles.length, files: scannedFiles, findings, durationMs: Date.now() - started, scannedAt: new Date().toISOString() };
+  return { projectPath, projectName: path.basename(projectPath), filesScanned: scannedFiles.length, analyzedFiles: scanFiles.length, directories, files: scannedFiles, findings, durationMs: Date.now() - started, scannedAt: new Date().toISOString() };
 }
 
-module.exports = { scanProject };
+module.exports = { scanProject, IMAGE_MIMES };
