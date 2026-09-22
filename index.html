@@ -44,11 +44,55 @@
   <section class="app-shell hidden" id="app-shell">
     <header class="app-topbar"><div class="auth-wordmark">Vuppo</div><div class="account-area"><span id="account-name"></span><button id="logout-button">sair</button></div></header>
     <main class="dashboard">
-      <div class="home-toolbar"><p class="vuppo-home-plan">Free Plan <span>·</span> Upgrade</p><button class="settings-button" id="settings-button" aria-label="Abrir configurações" title="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button></div>
+      <div class="home-toolbar">
+        <nav class="workspace-menus home-menus" aria-label="Menu do workspace">
+          <img class="file-menu-icon" src="vuppo-icon.png" alt="" />
+          <div class="workspace-menu">
+            <button class="workspace-menu-button file-menu-button" type="button" aria-expanded="false">File</button>
+            <div class="workspace-menu-dropdown">
+              <button type="button" data-home-view="explorer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9.5a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg><span>Explorer</span></button>
+              <button type="button" data-home-file-action="new-file"><span>New File</span></button>
+              <button type="button" data-home-file-action="new-window"><span>New Window</span></button>
+              <button type="button" data-home-file-action="open-file"><span>Open File...</span></button>
+              <button type="button" data-home-file-action="open-folder"><span>Open Folder...</span></button>
+              <button type="button" data-home-file-action="open-project"><span>Open Project...</span></button>
+              <button type="button" data-home-file-action="open-recent"><span>Open Recent</span></button>
+              <button type="button" data-home-file-action="save"><span>Save</span></button>
+              <button type="button" data-home-file-action="save-as"><span>Save As...</span></button>
+              <button type="button" data-home-file-action="save-all"><span>Save All</span></button>
+              <button type="button" data-home-file-action="close-editor"><span>Close Editor</span></button>
+              <button type="button" data-home-file-action="close-folder"><span>Close Folder</span></button>
+              <button type="button" data-home-file-action="exit"><span>Exit</span></button>
+            </div>
+          </div>
+          <div class="workspace-menu">
+            <button class="workspace-menu-button" type="button" aria-expanded="false">Workspace</button>
+            <div class="workspace-menu-dropdown">
+              <button type="button" data-home-view="git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg><span>Source control</span></button>
+              <button type="button" data-home-view="security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/></svg><span>Security Problems</span></button>
+            </div>
+          </div>
+        </nav>
+        <div class="home-toolbar-right">
+          <nav class="workspace-top-actions" aria-label="Ações do editor">
+            <button class="top-action-button" type="button" id="home-preview-button" title="Preview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h5M8 16h3"/></svg><span>Preview</span></button>
+            <button class="top-action-button" type="button" id="home-terminal-button" title="Terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg><span>Terminal</span></button>
+            <button class="top-action-button" type="button" id="home-chat-button" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/></svg><span>Chat</span></button>
+          </nav>
+          <button class="profile-button home-profile-button" type="button" id="home-profile-button" title="Perfil" aria-label="Perfil"><span>U</span></button>
+          <div class="profile-menu hidden" id="home-profile-menu"><strong>Perfil</strong><span id="home-profile-name">Conta local Vuppo</span><button type="button" class="profile-menu-item" data-home-profile-action="settings" title="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Configurações</span></button><button type="button" class="profile-close">Fechar</button></div>
+          <div class="window-controls home-window-controls" aria-label="Controles da janela">
+            <button type="button" class="window-control" id="home-minimize" title="Minimizar" aria-label="Minimizar"><span class="window-icon minimize-icon"></span></button>
+            <button type="button" class="window-control" id="home-maximize" title="Maximizar" aria-label="Maximizar"><span class="window-icon maximize-icon"></span></button>
+            <button type="button" class="window-control window-close" id="home-close" title="Fechar" aria-label="Fechar"><span class="close-icon">×</span></button>
+          </div>
+        </div>
+      </div>
       <div class="dashboard-intro"><div><p class="dashboard-kicker">AUDITORIA DE CÓDIGO</p><h2>Olá, <span id="welcome-name">você</span>.</h2><p>Encontre riscos antes que eles encontrem você.</p></div><button class="scan-button" id="choose-button"><svg class="choose-project-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h6l2 2h9v9.5a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-9.5a2 2 0 0 1 2-2Z"/><path d="M1.5 10.5h19"/></svg><span id="choose-button-label">selecionar projeto</span></button></div>
       <div class="dashboard-empty" id="dashboard-empty">
         <div class="vuppo-home-mark">Vuppo</div>
         <p class="vuppo-home-tagline">Security that moves with your code.</p>
+        <p class="vuppo-home-plan">Free Plan <span>·</span> Upgrade</p>
         <div class="project-actions">
           <button class="project-action" id="empty-choose"><svg class="project-action-icon folder-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg><span><strong>Open project</strong></span></button>
           <button class="project-action" id="clone-button"><svg class="project-action-icon git-action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg><span><strong>Clone Git Repository</strong></span></button>

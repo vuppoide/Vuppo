@@ -6,6 +6,42 @@ let activeInlineCreate = null;
 const RECENT_PROJECTS_KEY = 'vuppo.recentProjects';
 const $ = (selector) => document.querySelector(selector);
 
+const SETTINGS_STORAGE_KEY = 'vuppo.settings';
+const VUPPO_VERSION = '1.0.0';
+const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+const DEFAULT_SETTINGS = {
+  editorFontSize: 12,
+  editorWordWrap: true,
+  editorLineNumbers: true,
+  editorTabSize: 2,
+  autoSave: 'off',
+  autoSaveDelay: 1000,
+  chatSendOnEnter: true,
+  securityMinSeverity: 'all',
+  gitConfirmDiscard: true,
+};
+const SETTINGS_SCHEMA = [
+  { id: 'editor', label: 'Editor', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>', options: [
+    { key: 'editorFontSize', type: 'number', label: 'Tamanho da fonte do código', description: 'Tamanho da fonte usada no editor de código e na prévia.', min: 8, max: 32, step: 1 },
+    { key: 'editorWordWrap', type: 'checkbox', label: 'Quebra de linha automática', description: 'Define se as linhas longas são quebradas para caber na largura do editor.' },
+    { key: 'editorLineNumbers', type: 'checkbox', label: 'Números de linha', description: 'Exibe os números de linha ao lado do código.' },
+    { key: 'editorTabSize', type: 'number', label: 'Tamanho da tabulação', description: 'Quantidade de espaços equivalente a uma tabulação.', min: 2, max: 8, step: 1 },
+    { key: 'autoSave', type: 'select', label: 'Salvamento automático', description: 'Salva as alterações do editor automaticamente após um atraso.', choices: [['off', 'off'], ['afterDelay', 'afterDelay']] },
+    { key: 'autoSaveDelay', type: 'number', label: 'Atraso do salvamento automático', description: 'Tempo em milissegundos após digitar antes de salvar (requer autoSave: afterDelay).', min: 200, max: 10000, step: 100, isDisabled: (current) => current.autoSave !== 'afterDelay' },
+  ] },
+  { id: 'chat', label: 'Chat', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/></svg>', options: [
+    { key: 'chatSendOnEnter', type: 'checkbox', label: 'Enviar mensagem com Enter', description: 'Quando desativado, use Ctrl+Enter para enviar e o Enter insere uma nova linha.' },
+  ] },
+  { id: 'security', label: 'Segurança', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 5.5v5c0 4.6 3 8.4 7 10 4-1.6 7-5.4 7-10v-5Z"/><path d="m9.3 12 2 2 3.4-3.8"/></svg>', options: [
+    { key: 'securityMinSeverity', type: 'select', label: 'Severidade mínima exibida', description: 'Mostra no painel Security Problems apenas riscos com essa severidade ou superior.', choices: [['all', 'Todas'], ['medium', 'Médio e superior'], ['high', 'Alto e superior'], ['critical', 'Somente crítico']] },
+  ] },
+  { id: 'git', label: 'Git', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg>', options: [
+    { key: 'gitConfirmDiscard', type: 'checkbox', label: 'Confirmar antes de descartar alterações', description: 'Pede confirmação ao descartar as alterações de um arquivo no controle de versão.' },
+  ] },
+  { id: 'about', label: 'Sobre', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>', options: [] },
+];
+let settings = loadSettings();
+
 window.vuppo.getMaterialIconCatalog().then((catalog) => { materialIconCatalog = catalog; }).catch(() => {});
 
 function setError(message) {
@@ -205,11 +241,11 @@ function renderReport() {
         node = node.folders.get(folder);
       });
     });
-    const renderTreeNode = (node, level = 0, parentPath = '') => `${[...node.folders.entries()].sort(([first], [second]) => first.localeCompare(second)).map(([name, child]) => `<div class="tree-folder-item" style="--tree-level:${level}" data-folder="${escapeHtml(parentPath ? `${parentPath}/${name}` : name)}"><span class="tree-chevron">⌄</span><img src="assets/material-icons/folder.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(name)}</span></div><div class="tree-children">${renderTreeNode(child, level + 1, parentPath ? `${parentPath}/${name}` : name)}</div>`).join('')}${node.files.sort((first, second) => first.name.localeCompare(second.name)).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}" style="--tree-level:${level}" data-extension="${escapeHtml((file.name.includes('.') ? file.name.split('.').pop() : '').toLowerCase())}">${fileIconMarkup(file.name)}<span class="tree-file-label">${escapeHtml(file.name)}</span></button>`).join('')}`;
+    const renderTreeNode = (node, level = 0, parentPath = '') => `${[...node.folders.entries()].sort(([first], [second]) => compareTreeEntries(first, second)).map(([name, child]) => `<div class="tree-folder-item" style="--tree-level:${level}" data-folder="${escapeHtml(parentPath ? `${parentPath}/${name}` : name)}"><span class="tree-chevron">⌄</span><img src="assets/material-icons/folder.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(name)}</span></div><div class="tree-children">${renderTreeNode(child, level + 1, parentPath ? `${parentPath}/${name}` : name)}</div>`).join('')}${node.files.sort((first, second) => compareTreeEntries(first.name, second.name)).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}" style="--tree-level:${level}" data-extension="${escapeHtml((file.name.includes('.') ? file.name.split('.').pop() : '').toLowerCase())}">${fileIconMarkup(file.name)}<span class="tree-file-label">${escapeHtml(file.name)}</span></button>`).join('')}`;
     fileTree.innerHTML = `<div class="tree-folder"><span class="tree-chevron">⌄</span><img src="assets/material-icons/folder-open.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(currentReport.projectName)}</span></div><div class="tree-children root-children">${renderTreeNode(treeRoot)}</div>`;
   }
   const explorerTitle = workspace.querySelector('.sidebar-title');
-  explorerTitle.innerHTML = '<span>EXPLORER</span><div class="explorer-actions"><button type="button" class="explorer-more" title="Mais ações" aria-label="Mais ações" aria-expanded="false">...</button><div class="explorer-menu hidden"><button type="button" data-explorer-action="collapse">Recolher pasta</button><button type="button" data-explorer-action="new-folder">Nova pasta</button><button type="button" data-explorer-action="new-file">Novo arquivo</button></div></div>';
+  explorerTitle.innerHTML = '<span>EXPLORER</span><div class="explorer-actions"><button type="button" class="explorer-more" title="Mais ações" aria-label="Mais ações" aria-expanded="false">...</button><div class="explorer-menu hidden"><button type="button" data-explorer-action="collapse"><i class="codicon codicon-collapse-all" aria-hidden="true"></i><span>Recolher pastas</span></button><button type="button" data-explorer-action="new-folder"><i class="codicon codicon-new-folder" aria-hidden="true"></i><span>Nova pasta...</span></button><button type="button" data-explorer-action="new-file"><i class="codicon codicon-new-file" aria-hidden="true"></i><span>Novo arquivo...</span></button></div></div>';
   const explorerFolder = workspace.querySelector('.tree-folder');
   explorerFolder.innerHTML = `<span class="tree-chevron">⌄</span><img src="assets/material-icons/folder-open.svg" class="tree-folder-icon" alt="" /><span class="tree-folder-label">${escapeHtml(currentReport.projectName)}</span>`;
   workspace.querySelectorAll('.tree-file').forEach((button) => {
@@ -245,15 +281,17 @@ function renderReport() {
   explorerMenu?.querySelector('[data-explorer-action="new-folder"]')?.addEventListener('click', (event) => {
     event.stopPropagation();
     closeExplorerMenu();
-    startExplorerCreate('folder');
+    startExplorerCreate('folder', currentExplorerCreateTarget());
   });
   explorerMenu?.querySelector('[data-explorer-action="new-file"]')?.addEventListener('click', (event) => {
     event.stopPropagation();
     closeExplorerMenu();
-    startExplorerCreate('file');
+    startExplorerCreate('file', currentExplorerCreateTarget());
   });
   workspace.querySelectorAll('.tree-folder-item').forEach((folder) => folder.addEventListener('click', (event) => {
     event.stopPropagation();
+    workspace.querySelectorAll('.tree-folder-item.selected, .tree-file.selected').forEach((item) => item.classList.remove('selected'));
+    folder.classList.add('selected');
     const children = folder.nextElementSibling;
     if (!children) return;
     const collapsed = children.classList.toggle('collapsed');
@@ -275,6 +313,7 @@ function renderReport() {
   openEditorsMenu?.querySelector('[data-open-editor-action="close"]')?.addEventListener('click', closeActiveEditor);
   openEditorsMenu?.querySelector('[data-open-editor-action="close-all"]')?.addEventListener('click', () => [...workspace.querySelectorAll('.editor-tab')].forEach((tab) => closeEditorTab(tab.dataset.file)));
   $('#workspace-close')?.addEventListener('click', closeWorkspaceFolder);
+  applySettings();
 }
 
 function resolveProjectPreviewUrl() {
@@ -362,7 +401,7 @@ function setupWorkspaceControls(workspace) {
   workspace.querySelectorAll('.top-action-button').forEach((button) => button.classList.remove('active'));
   const sideViews = {
     explorer: '<div class="sidebar-title">EXPLORER</div><div class="file-tree"><div class="tree-folder">Projeto analisado</div><p class="workspace-view-copy">Selecione um arquivo para abrir seu código.</p></div>',
-    git: '<div class="workspace-side-view" data-side-view="git"><div class="sidebar-title">SOURCE CONTROL</div><div class="workspace-view-empty"><strong>Controle de versão</strong><span>Nenhuma alteração pendente.</span></div></div>',
+    git: '<div class="workspace-side-view sc-view" data-side-view="git"><div class="sidebar-title">SOURCE CONTROL<i class="codicon codicon-git-commit sc-title-icon" aria-hidden="true"></i><button type="button" class="sc-refresh" title="Atualizar" aria-label="Atualizar"><i class="codicon codicon-refresh" aria-hidden="true"></i></button><button type="button" class="sc-more" title="Mais ações" aria-label="Mais ações"><i class="codicon codicon-ellipsis" aria-hidden="true"></i></button></div><div class="sc-body"></div></div>',
     extensions: '<div class="workspace-side-view" data-side-view="extensions"><div class="sidebar-title">EXTENSÕES</div><div class="workspace-view-empty"><strong>Extensões</strong><span>O catálogo estará disponível em breve.</span></div></div>',
     settings: '<div class="workspace-side-view" data-side-view="settings"><div class="sidebar-title">CONFIGURAÇÕES</div><div class="workspace-view-empty"><strong>Configurações</strong><span>Preferências do editor.</span></div></div>'
   };
@@ -416,6 +455,7 @@ function setupWorkspaceControls(workspace) {
   const chatFileInput = chatInput.querySelector('.chat-file-input');
   const chatHistoryToggle = chatPanel.querySelector('.chat-history-toggle');
   const chatComposer = chatPanel.querySelector('.chat-composer');
+  renderChatContextChips();
   const hideChatHistory = () => {
     chatHistory.classList.add('hidden');
     chatThread.classList.remove('hidden');
@@ -538,7 +578,8 @@ function setupWorkspaceControls(workspace) {
     chatMessageInput.focus();
   });
   chatMessageInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    const sendOnEnter = getSettings().chatSendOnEnter !== false;
+    if (event.key === 'Enter' && !event.shiftKey && (sendOnEnter ? true : event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       sendChatMessage();
     }
@@ -862,7 +903,13 @@ function setupWorkspaceControls(workspace) {
   workspace.querySelectorAll('.activity-button').forEach((button) => {
     const title = button.getAttribute('title');
     const view = title === 'Explorador de arquivos' ? 'explorer' : title === 'Git' ? 'git' : title === 'Extensões' ? 'extensions' : title === 'Configurações' ? 'settings' : 'security';
-    button.addEventListener('click', () => openWorkspaceView(view, button));
+    button.addEventListener('click', () => {
+      if (view === 'settings') {
+        openVuppoSettings();
+        return;
+      }
+      openWorkspaceView(view, button);
+    });
   });
   workspace.querySelectorAll('[data-workspace-view]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -874,25 +921,100 @@ function setupWorkspaceControls(workspace) {
   const fileTree = workspace.querySelector('.file-tree');
   const treeContextMenu = document.createElement('div');
   treeContextMenu.className = 'tree-context-menu hidden';
-  treeContextMenu.innerHTML = '<button type="button" data-tree-action="new-file"><span>Novo arquivo</span></button><button type="button" data-tree-action="new-folder"><span>Nova pasta</span></button>';
+  treeContextMenu.setAttribute('role', 'menu');
+  treeContextMenu.setAttribute('aria-label', 'Ações do explorador');
+  treeContextMenu.innerHTML = [
+    '<button type="button" role="menuitem" data-tree-action="new-file"><i class="codicon codicon-new-file" aria-hidden="true"></i><span>Novo arquivo...</span></button>',
+    '<button type="button" role="menuitem" data-tree-action="new-folder"><i class="codicon codicon-new-folder" aria-hidden="true"></i><span>Nova pasta...</span></button>',
+    '<div class="tree-context-separator" role="separator"></div>',
+    '<button type="button" role="menuitem" data-tree-action="add-to-chat"><i class="codicon codicon-comment-discussion" aria-hidden="true"></i><span>Adicionar ao chat</span></button>',
+    '<button type="button" role="menuitem" data-tree-action="copy"><i class="codicon codicon-copy" aria-hidden="true"></i><span>Copiar</span></button>',
+    '<button type="button" role="menuitem" data-tree-action="paste"><i class="codicon codicon-clippy" aria-hidden="true"></i><span>Colar</span></button>',
+    '<div class="tree-context-separator" data-tree-separator="item" role="separator"></div>',
+    '<button type="button" role="menuitem" data-tree-action="rename"><i class="codicon codicon-edit" aria-hidden="true"></i><span>Renomear...</span></button>',
+    '<button type="button" role="menuitem" data-tree-action="delete"><i class="codicon codicon-trash" aria-hidden="true"></i><span>Excluir</span></button>',
+    '<button type="button" role="menuitem" data-tree-action="refresh"><i class="codicon codicon-refresh" aria-hidden="true"></i><span>Atualizar</span></button>'
+  ].join('');
   workspace.appendChild(treeContextMenu);
   const hideTreeContextMenu = () => treeContextMenu.classList.add('hidden');
+  const selectTreeRow = (row) => {
+    workspace.querySelectorAll('.tree-folder-item.selected, .tree-file.selected').forEach((item) => item.classList.remove('selected'));
+    row?.classList.add('selected');
+  };
+  const setTreeMenuContext = (isItem, isFolder) => {
+    treeContextMenu.querySelectorAll('[data-tree-action]').forEach((button) => {
+      const action = button.dataset.treeAction;
+      let visible = true;
+      if (['add-to-chat', 'copy', 'rename', 'delete'].includes(action)) visible = isItem;
+      else if (action === 'paste') visible = !isItem || isFolder;
+      else if (action === 'refresh') visible = !isItem;
+      button.classList.toggle('hidden', !visible);
+      if (action === 'paste') button.disabled = !explorerClipboard;
+    });
+    treeContextMenu.querySelectorAll('[data-tree-separator]').forEach((separator) => {
+      separator.classList.toggle('hidden', separator.dataset.treeSeparator === 'item' && !isItem);
+    });
+  };
+  const showTreeContextMenu = (targetFolder, x, y, context = {}) => {
+    treeContextMenu.dataset.targetFolder = normalizeTreePath(targetFolder);
+    treeContextMenu.dataset.targetEntry = context.relativePath || '';
+    treeContextMenu.dataset.targetIsFolder = String(Boolean(context.isFolder));
+    setTreeMenuContext(Boolean(context.relativePath), Boolean(context.isFolder));
+    treeContextMenu.style.left = '0px';
+    treeContextMenu.style.top = '0px';
+    treeContextMenu.classList.remove('hidden');
+    const bounds = treeContextMenu.getBoundingClientRect();
+    treeContextMenu.style.left = `${Math.min(Math.max(8, x), Math.max(8, window.innerWidth - bounds.width - 8))}px`;
+    treeContextMenu.style.top = `${Math.min(Math.max(8, y), Math.max(8, window.innerHeight - bounds.height - 8))}px`;
+  };
   fileTree?.addEventListener('contextmenu', (event) => {
+    if (event.target.closest('input, textarea, [contenteditable="true"], .tree-create-row')) return;
     const folderRow = event.target.closest('.tree-folder-item');
     const fileButton = event.target.closest('.tree-file');
-    if (!folderRow && !fileButton) return;
     event.preventDefault();
-    treeContextMenu.dataset.targetFolder = folderRow ? normalizeTreePath(folderRow.dataset.folder) : parentTreePath(fileButton.dataset.file);
-    treeContextMenu.style.left = `${event.clientX}px`;
-    treeContextMenu.style.top = `${event.clientY}px`;
-    treeContextMenu.classList.remove('hidden');
+    if (fileButton) {
+      selectTreeRow(fileButton);
+      showTreeContextMenu(parentTreePath(fileButton.dataset.file), event.clientX, event.clientY, { relativePath: fileButton.dataset.file, isFolder: false });
+      return;
+    }
+    selectTreeRow(folderRow || null);
+    showTreeContextMenu(folderRow ? folderRow.dataset.folder : '', event.clientX, event.clientY, folderRow ? { relativePath: folderRow.dataset.folder, isFolder: true } : {});
   });
-  treeContextMenu.addEventListener('click', (event) => {
+  fileTree?.addEventListener('scroll', hideTreeContextMenu);
+  treeContextMenu.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-tree-action]')?.dataset.treeAction;
     if (!action) return;
     const targetFolder = treeContextMenu.dataset.targetFolder || '';
+    const targetEntry = treeContextMenu.dataset.targetEntry || '';
+    const targetIsFolder = treeContextMenu.dataset.targetIsFolder === 'true';
     hideTreeContextMenu();
-    startExplorerCreate(action === 'new-folder' ? 'folder' : 'file', targetFolder);
+    switch (action) {
+      case 'new-file': startExplorerCreate('file', targetFolder); break;
+      case 'new-folder': startExplorerCreate('folder', targetFolder); break;
+      case 'add-to-chat': addExplorerEntryToChat(targetEntry, targetIsFolder); break;
+      case 'copy': await copyExplorerEntry(targetEntry, targetIsFolder); break;
+      case 'paste': await pasteExplorerEntry(targetFolder); break;
+      case 'rename': startExplorerRename(targetEntry); break;
+      case 'delete': await deleteExplorerEntry(targetEntry); break;
+      case 'refresh': await analyzeProject(currentReport.projectPath); break;
+      default: break;
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (activeInlineCreate) return;
+    if (event.target instanceof HTMLElement && event.target.closest('input, textarea, [contenteditable="true"]')) return;
+    const selectedRow = workspace.querySelector('.tree-folder-item.selected, .tree-file.selected');
+    if (!selectedRow || !document.body.contains(selectedRow)) return;
+    const relativePath = selectedRow.dataset.folder || selectedRow.dataset.file;
+    if (event.key === 'F2') {
+      event.preventDefault();
+      startExplorerRename(relativePath);
+      return;
+    }
+    if (event.key === 'Delete') {
+      event.preventDefault();
+      deleteExplorerEntry(relativePath);
+    }
   });
   document.addEventListener('click', (event) => { if (!treeContextMenu.contains(event.target)) hideTreeContextMenu(); });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') hideTreeContextMenu(); });
@@ -1009,10 +1131,10 @@ function setupWorkspaceControls(workspace) {
   const setWindowState = (isMaximized) => {
     const icon = maximizeButton?.querySelector('.window-icon');
     if (icon) {
-      icon.className = 'window-icon maximize-icon';
+      icon.className = `window-icon ${isMaximized ? 'restore-icon' : 'maximize-icon'}`;
     }
-    maximizeButton.title = 'Maximizar';
-    maximizeButton.setAttribute('aria-label', 'Maximizar');
+    maximizeButton.title = isMaximized ? 'Restaurar' : 'Maximizar';
+    maximizeButton.setAttribute('aria-label', isMaximized ? 'Restaurar' : 'Maximizar');
   };
   workspace.querySelector('[data-window-action="minimize"]').addEventListener('click', () => window.vuppo.minimizeWindow());
   let windowStateRequest = 0;
@@ -1027,9 +1149,140 @@ function setupWorkspaceControls(workspace) {
   profileButton.addEventListener('click', () => profileMenu.classList.toggle('hidden'));
   profileMenu.querySelector('[data-profile-action="settings"]').addEventListener('click', () => {
     profileMenu.classList.add('hidden');
-    openWorkspaceView('settings', null);
+    openVuppoSettings();
   });
   profileMenu.querySelector('.profile-close').addEventListener('click', () => profileMenu.classList.add('hidden'));
+  setupSourceControlView(workspace);
+}
+
+function getGitChanges() {
+  return {
+    staged: (currentReport.gitChanges || []).filter((change) => !change.untracked && change.x !== ' ' && change.x !== '?'),
+    unstaged: (currentReport.gitChanges || []).filter((change) => change.untracked || change.y !== ' ' || change.y === '?'),
+  };
+}
+
+function gitStatusLabel(change) {
+  const codes = { M: 'M', A: 'A', D: 'D', U: 'U', R: 'R', C: 'C', '?': 'U' };
+  const code = change.untracked ? '?' : (change.x !== ' ' && change.x !== '?' ? change.x : change.y);
+  return codes[code] || code;
+}
+
+function gitStatusClass(change) {
+  const code = change.untracked ? '?' : (change.x !== ' ' && change.x !== '?' ? change.x : change.y);
+  if (code === 'D') return 'deleted';
+  if (code === 'A' || code === '?' || code === 'U') return 'added';
+  return 'modified';
+}
+
+function renderSourceControlView() {
+  const scBody = document.querySelector('.workspace-sidebar .sc-body');
+  if (!scBody || !currentReport) return;
+  const status = currentReport.gitStatus;
+  if (!status) { scBody.innerHTML = '<div class="sc-loading">Carregando…</div>'; return; }
+  if (!status.isRepo) {
+    scBody.innerHTML = '<div class="sc-empty-repo"><button type="button" class="sc-button sc-init" title="Inicializar repositório">Inicializar repositório</button><span class="sc-empty-copy">Para melhor gerenciar as alterações do seu workspace, é preciso inicializar um repositório.</span></div>';
+    scBody.querySelector('.sc-init').addEventListener('click', async () => {
+      try {
+        await window.vuppo.gitInit(currentReport.projectPath);
+        await refreshSourceControl();
+      } catch (error) {
+        alert(error.message || 'Não foi possível inicializar o repositório.');
+      }
+    });
+    return;
+  }
+  renderSourceControlChanges(scBody);
+}
+
+function renderSourceControlChanges(scBody) {
+  const { staged, unstaged } = getGitChanges();
+  const status = currentReport.gitStatus;
+  const hasChanges = staged.length + unstaged.length > 0;
+  const row = (change, index, section) => {
+    const label = section === 'staged' ? (change.untracked ? 'A' : change.x) : (change.untracked ? 'U' : change.y);
+    const actions = section === 'staged'
+      ? '<button type="button" class="sc-row-action" data-sc-action="unstage" title="Retirar do stage"><i class="codicon codicon-cloud-download" aria-hidden="true"></i></button><button type="button" class="sc-row-action" data-sc-action="discard" title="Descartar alterações"><i class="codicon codicon-discard" aria-hidden="true"></i></button>'
+      : '<button type="button" class="sc-row-action" data-sc-action="stage" title="Adicionar ao stage"><i class="codicon codicon-add" aria-hidden="true"></i></button><button type="button" class="sc-row-action" data-sc-action="discard" title="Descartar alterações"><i class="codicon codicon-discard" aria-hidden="true"></i></button>';
+    const name = change.path.split(/[\\/]/).pop();
+    const folder = change.path.split(/[\\/]/).slice(0, -1).join('/');
+    return `<div class="sc-row" data-sc-section="${section}" data-sc-index="${index}" title="${escapeHtml(change.path)}"><span class="sc-file-name">${escapeHtml(name)}</span><span class="sc-file-path">${escapeHtml(folder)}</span>${actions}<span class="sc-badge sc-badge-${gitStatusClass(change)}">${escapeHtml(label)}</span></div>`;
+  };
+  scBody.innerHTML = `
+    <div class="sc-commit-box">
+      <div class="sc-branch-row"><i class="codicon codicon-git-branch" aria-hidden="true"></i><span>${escapeHtml(status.branch || 'main')}</span><span class="sc-branch-count">${hasChanges ? staged.length + unstaged.length : ''}</span></div>
+      <textarea class="sc-message" rows="1" placeholder="Mensagem de commit (Ctrl+Enter para commit)" aria-label="Mensagem de commit"></textarea>
+      <button type="button" class="sc-button sc-commit" ${hasChanges ? '' : 'disabled'}><i class="codicon codicon-check" aria-hidden="true"></i><span>Commit</span></button>
+    </div>
+    <div class="sc-sections">
+      ${staged.length ? `<div class="sc-section"><div class="sc-section-header"><span>Staged Changes</span><span class="sc-section-count">${staged.length}</span></div>${staged.map((change, index) => row(change, index, 'staged')).join('')}</div>` : ''}
+      ${unstaged.length ? `<div class="sc-section"><div class="sc-section-header"><span>Changes</span><span class="sc-section-count">${unstaged.length}</span></div>${unstaged.map((change, index) => row(change, index, 'unstaged')).join('')}</div>` : ''}
+      ${!hasChanges ? '<div class="sc-no-changes"><i class="codicon codicon-check-all" aria-hidden="true"></i><span>Nenhuma alteração pendente.</span></div>' : ''}
+    </div>`;
+  const messageInput = scBody.querySelector('.sc-message');
+  const commitButton = scBody.querySelector('.sc-commit');
+  const runCommit = async () => {
+    if (!messageInput.value.trim()) { messageInput.focus(); return; }
+    commitButton.disabled = true;
+    try {
+      await window.vuppo.gitCommit({ projectPath: currentReport.projectPath, message: messageInput.value });
+      messageInput.value = '';
+      await refreshSourceControl();
+    } catch (error) {
+      alert(error.message || 'Não foi possível fazer o commit.');
+      commitButton.disabled = false;
+    }
+  };
+  commitButton.addEventListener('click', runCommit);
+  messageInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      runCommit();
+    }
+  });
+  scBody.querySelectorAll('.sc-row').forEach((rowElement) => {
+    rowElement.addEventListener('click', async (event) => {
+      const action = event.target.closest('[data-sc-action]')?.dataset.scAction;
+      if (!action) return;
+      const change = (rowElement.dataset.scSection === 'staged' ? staged : unstaged)[Number(rowElement.dataset.scIndex)];
+      if (!change) return;
+      const params = { projectPath: currentReport.projectPath, path: change.path, untracked: change.untracked };
+      try {
+        if (action === 'stage') await window.vuppo.gitStage(params);
+        else if (action === 'unstage') await window.vuppo.gitUnstage(params);
+        else if (action === 'discard' && (!getSettings().gitConfirmDiscard || confirm(`Deseja descartar as alterações em ${change.path}?`))) await window.vuppo.gitDiscard(params);
+        else return;
+        await refreshSourceControl();
+      } catch (error) {
+        alert(error.message || 'Não foi possível executar a ação do Git.');
+        await refreshSourceControl();
+      }
+    });
+  });
+}
+
+async function refreshSourceControl() {
+  if (!currentReport?.projectPath) return;
+  try {
+    const status = await window.vuppo.gitStatus(currentReport.projectPath);
+    currentReport.gitStatus = status;
+    currentReport.gitChanges = status.changes;
+  } catch {
+    currentReport.gitStatus = { isRepo: false, branch: '', changes: [] };
+    currentReport.gitChanges = [];
+  }
+  renderSourceControlView();
+}
+
+function setupSourceControlView(workspace) {
+  const refreshButton = workspace.querySelector('.sc-refresh');
+  if (!refreshButton) return;
+  refreshButton.addEventListener('click', () => refreshSourceControl());
+  workspace.querySelector('.sc-more')?.addEventListener('click', () => refreshSourceControl());
+  refreshSourceControl();
+  workspace.querySelectorAll('[data-workspace-view="git"], .activity-button[title="Git"]').forEach((button) => {
+    button.addEventListener('click', () => refreshSourceControl());
+  });
 }
 
 function selectWorkspaceFinding(index) {
@@ -1120,20 +1373,107 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
   const content = fileData.content ?? fallbackText ?? '// Arquivo sem conteúdo legível.';
   const safeContent = typeof content === 'string' && content.trim().length > 0 ? content : (fallbackText || '// Arquivo vazio ou não legível.');
   const lineCount = safeContent.split(/\r?\n/).length;
-  editorContent.innerHTML = `<div class="line-numbers">${Array.from({ length: Math.max(12, findingLine || lineCount, lineCount) }, (_, line) => `<span>${line + 1}</span>`).join('')}</div><div class="code-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editor de código" spellcheck="false"></div>`;
+  editorContent.innerHTML = `<div class="line-numbers">${Array.from({ length: Math.max(12, findingLine || lineCount, lineCount) }, (_, line) => `<span>${line + 1}</span>`).join('')}</div><div class="code-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editor de código" spellcheck="false"></div><div class="minimap" aria-hidden="true"><canvas class="minimap-canvas"></canvas><div class="minimap-viewport"></div></div>`;
   const codeEditor = editorContent.querySelector('.code-editor');
   const lineNumbers = editorContent.querySelector('.line-numbers');
+  const minimap = editorContent.querySelector('.minimap');
+  const minimapCanvas = editorContent.querySelector('.minimap-canvas');
+  const minimapViewport = editorContent.querySelector('.minimap-viewport');
   codeEditor.textContent = safeContent;
   codeEditor.tabIndex = 0;
   codeEditor.focus();
+  const MINIMAP_LINE_HEIGHT = 3;
+  const MINIMAP_CHAR_WIDTH = 2;
+  const drawMinimap = () => {
+    const lines = codeEditor.innerText.replace(/\r\n/g, '\n').split('\n');
+    const width = 120;
+    const fontSize = 4;
+    const height = Math.min(lines.length * MINIMAP_LINE_HEIGHT + fontSize, 6000);
+    const ratio = window.devicePixelRatio || 1;
+    minimapCanvas.width = width * ratio;
+    minimapCanvas.height = height * ratio;
+    minimapCanvas.style.width = `${width}px`;
+    minimapCanvas.style.height = `${height}px`;
+    const context = minimapCanvas.getContext('2d');
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.font = `${fontSize}px Consolas, monospace`;
+    context.textBaseline = 'top';
+    const keywordColor = '#569cd6';
+    const stringColor = '#ce9178';
+    const commentColor = '#6a9955';
+    const numberColor = '#b5cea8';
+    const defaultColor = '#9cdcfe';
+    lines.forEach((line, index) => {
+      const trimmed = line.trimStart();
+      if (!trimmed) return;
+      const indent = (line.length - trimmed.length) * MINIMAP_CHAR_WIDTH;
+      const y = index * MINIMAP_LINE_HEIGHT;
+      let x = Math.min(indent, width - 4);
+      const isComment = /^(\/\/|\/\*|\*|#)/.test(trimmed);
+      const tokens = trimmed.match(/("[^"]*"|'[^']*'|`[^`]*`)|(\b\d+(?:\.\d+)?\b)|(\b(?:function|const|let|var|return|if|else|for|while|import|export|from|class|new|async|await|try|catch|throw|typeof|this|def|public|private|static|void|int|string|bool)\b)|(\w+|\S)/g) || [];
+      tokens.forEach((token) => {
+        if (x >= width) return;
+        let color = defaultColor;
+        if (isComment) color = commentColor;
+        else if (/^["'`]/.test(token)) color = stringColor;
+        else if (/^\d/.test(token)) color = numberColor;
+        else if (/^(function|const|let|var|return|if|else|for|while|import|export|from|class|new|async|await|try|catch|throw|typeof|this|def|public|private|static|void|int|string|bool)$/.test(token)) color = keywordColor;
+        else if (/^[A-Z]/.test(token)) color = '#4ec9b0';
+        context.fillStyle = color;
+        context.fillText(token, x, y + 0.5);
+        x += context.measureText(token).width + 1;
+      });
+    });
+    updateMinimapViewport();
+  };
+  const updateMinimapViewport = () => {
+    const scrollHeight = codeEditor.scrollHeight || 1;
+    const clientHeight = codeEditor.clientHeight || 1;
+    const canvasHeight = parseFloat(minimapCanvas.style.height) || 0;
+    if (!canvasHeight || !scrollHeight || scrollHeight <= clientHeight) {
+      minimapViewport.style.display = 'none';
+      return;
+    }
+    minimapViewport.style.display = 'block';
+    const contentLines = scrollHeight / parseFloat(getComputedStyle(codeEditor).lineHeight || 18);
+    const totalMinimapHeight = contentLines * MINIMAP_LINE_HEIGHT;
+    const viewportTop = (codeEditor.scrollTop / scrollHeight) * Math.min(canvasHeight, totalMinimapHeight);
+    const viewportHeight = (clientHeight / scrollHeight) * Math.min(canvasHeight, totalMinimapHeight);
+    minimapViewport.style.top = `${Math.max(0, viewportTop)}px`;
+    minimapViewport.style.height = `${Math.max(14, viewportHeight)}px`;
+  };
+  const minimapScrollTo = (clientY) => {
+    const bounds = minimap.getBoundingClientRect();
+    const canvasHeight = parseFloat(minimapCanvas.style.height) || 1;
+    const ratio = Math.min(1, Math.max(0, (clientY - bounds.top) / Math.max(1, Math.min(bounds.height, canvasHeight))));
+    codeEditor.scrollTop = ratio * (codeEditor.scrollHeight - codeEditor.clientHeight);
+  };
+  let minimapDragging = false;
+  minimap.addEventListener('mousedown', (event) => {
+    minimapDragging = true;
+    minimapScrollTo(event.clientY);
+    event.preventDefault();
+  });
+  window.addEventListener('mousemove', (event) => { if (minimapDragging) minimapScrollTo(event.clientY); });
+  window.addEventListener('mouseup', () => { minimapDragging = false; });
+  new ResizeObserver(() => { updateMinimapViewport(); }).observe(codeEditor);
+  drawMinimap();
+
   codeEditor.addEventListener('scroll', () => {
     lineNumbers.style.transform = `translateY(${-codeEditor.scrollTop}px)`;
+    updateMinimapViewport();
   });
   codeEditor.addEventListener('input', () => {
     const editedContent = codeEditor.innerText.replace(/\r\n/g, '\n');
     const lines = editedContent.split('\n').length;
     lineNumbers.innerHTML = Array.from({ length: Math.max(12, lines) }, (_, line) => `<span>${line + 1}</span>`).join('');
     fileData.content = editedContent;
+    drawMinimap();
+    if (getSettings().autoSave === 'afterDelay') {
+      clearTimeout(codeEditor._vuppoAutoSaveTimer);
+      codeEditor._vuppoAutoSaveTimer = setTimeout(() => codeEditor.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })), Number(getSettings().autoSaveDelay) || 1000);
+    }
   });
   codeEditor.addEventListener('keydown', async (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -1172,7 +1512,170 @@ function fileIconMarkup(fileName) {
   return `<img src="assets/material-icons/${materialIcon}.svg" class="tree-file-icon file-icon-${type}" alt="" />`;
 }
 
+function loadSettings() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}');
+    return { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? stored : {}) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function getSettings() {
+  return settings;
+}
+
+function saveSettings() {
+  try { window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings)); } catch { /* armazenamento indisponível */ }
+}
+
+function findSettingOption(key) {
+  return SETTINGS_SCHEMA.flatMap((category) => category.options).find((option) => option.key === key) || null;
+}
+
+function normalizeSettingValue(option, value) {
+  if (!option) return value;
+  if (option.type === 'checkbox') return Boolean(value);
+  if (option.type === 'number') {
+    let parsed = Number(value);
+    if (!Number.isFinite(parsed)) parsed = DEFAULT_SETTINGS[option.key];
+    const min = option.min ?? parsed;
+    const max = option.max ?? parsed;
+    return Math.min(Math.max(parsed, min), max);
+  }
+  if (option.type === 'select') return option.choices.some(([stored]) => stored === value) ? value : DEFAULT_SETTINGS[option.key];
+  return value;
+}
+
+function setSetting(key, value) {
+  if (!(key in DEFAULT_SETTINGS)) return;
+  settings = { ...settings, [key]: normalizeSettingValue(findSettingOption(key), value) };
+  saveSettings();
+  applySettings();
+  renderSettingsContent();
+}
+
+function applySettings() {
+  const root = document.documentElement;
+  root.style.setProperty('--vuppo-code-font-size', `${settings.editorFontSize}px`);
+  root.style.setProperty('--vuppo-code-tab-size', `${settings.editorTabSize}`);
+  document.body.classList.toggle('vuppo-nowrap-code', settings.editorWordWrap === false);
+  document.body.classList.toggle('vuppo-hide-line-numbers', settings.editorLineNumbers === false);
+  applySeverityFilter();
+}
+
+function applySeverityFilter() {
+  const minRank = SEVERITY_RANK[settings.securityMinSeverity] || 1;
+  document.querySelectorAll('.workspace-findings').forEach((list) => {
+    const rows = [...list.querySelectorAll('.workspace-finding')];
+    let visible = 0;
+    rows.forEach((row) => {
+      const severity = [...(row.querySelector('.finding-severity')?.classList || [])].find((name) => name !== 'finding-severity') || 'low';
+      const show = (SEVERITY_RANK[severity] || 0) >= minRank;
+      row.classList.toggle('hidden', !show);
+      if (show) visible += 1;
+    });
+    const notice = list.querySelector('.severity-filter-empty');
+    if (rows.length && !visible) {
+      if (!notice) {
+        const empty = document.createElement('div');
+        empty.className = 'workspace-empty-state severity-filter-empty';
+        empty.textContent = 'Nenhum risco corresponde ao filtro de severidade definido nas configurações.';
+        list.appendChild(empty);
+      }
+    } else notice?.remove();
+  });
+}
+
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character])); }
+
+let settingsActiveCategory = 'editor';
+let settingsOverlayElement = null;
+
+function ensureSettingsOverlay() {
+  if (settingsOverlayElement) return;
+  document.body.insertAdjacentHTML('beforeend', `<div class="vuppo-settings-overlay hidden" id="vuppo-settings" role="dialog" aria-modal="true" aria-label="Configurações"><header class="vuppo-settings-topbar"><span class="vuppo-settings-logo">V</span><strong>Configurações</strong><div class="vuppo-settings-search"><i class="codicon codicon-search" aria-hidden="true"></i><input id="vuppo-settings-search" type="text" placeholder="Procurar configurações" autocomplete="off" spellcheck="false" aria-label="Procurar configurações" /></div><button type="button" class="vuppo-settings-close" id="vuppo-settings-close" title="Fechar (Esc)" aria-label="Fechar configurações">×</button></header><div class="vuppo-settings-layout"><nav class="vuppo-settings-categories" id="vuppo-settings-categories" aria-label="Categorias"></nav><div class="vuppo-settings-content" id="vuppo-settings-content"></div></div><footer class="vuppo-settings-footer"><span>Vuppo <b>${VUPPO_VERSION}</b></span><span>Editor de código com auditoria de segurança integrada</span></footer></div>`);
+  settingsOverlayElement = $('#vuppo-settings');
+  const categoriesNav = $('#vuppo-settings-categories');
+  const content = $('#vuppo-settings-content');
+  const searchInput = $('#vuppo-settings-search');
+  $('#vuppo-settings-close').addEventListener('click', closeVuppoSettings);
+  categoriesNav.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-settings-category]');
+    if (!item) return;
+    settingsActiveCategory = item.dataset.settingsCategory;
+    if (searchInput) searchInput.value = '';
+    renderSettingsContent();
+  });
+  content.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-setting-input]');
+    if (!input) return;
+    setSetting(input.dataset.settingInput, input.type === 'checkbox' ? input.checked : input.value);
+  });
+  content.addEventListener('click', (event) => {
+    const resetButton = event.target.closest('[data-reset-setting]');
+    if (!resetButton) return;
+    setSetting(resetButton.dataset.resetSetting, DEFAULT_SETTINGS[resetButton.dataset.resetSetting]);
+  });
+  searchInput.addEventListener('input', () => renderSettingsContent());
+}
+
+function renderSettingsRow(option) {
+  const value = settings[option.key];
+  const isModified = value !== DEFAULT_SETTINGS[option.key];
+  const disabled = option.isDisabled ? Boolean(option.isDisabled(settings)) : false;
+  let control = '';
+  if (option.type === 'checkbox') control = `<label class="settings-checkbox"><input type="checkbox" data-setting-input="${option.key}" ${value ? 'checked' : ''} aria-label="${escapeHtml(option.label)}" /><span></span></label>`;
+  else if (option.type === 'number') control = `<input type="number" data-setting-input="${option.key}" value="${value}" min="${option.min}" max="${option.max}" step="${option.step || 1}" aria-label="${escapeHtml(option.label)}" />`;
+  else if (option.type === 'select') control = `<select data-setting-input="${option.key}" aria-label="${escapeHtml(option.label)}">${option.choices.map(([stored, label]) => `<option value="${stored}" ${stored === value ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+  return `<div class="settings-row ${isModified ? 'is-modified' : ''} ${disabled ? 'is-disabled' : ''}" data-setting-row="${option.key}"><div class="settings-row-text"><strong>${escapeHtml(option.label)}</strong><span>${escapeHtml(option.description || '')}</span></div><div class="settings-row-control">${control}<button type="button" class="settings-reset" data-reset-setting="${option.key}" title="Redefinir configuração" aria-label="Redefinir ${escapeHtml(option.label)}">⟲</button></div></div>`;
+}
+
+function renderSettingsContent() {
+  const categoriesNav = $('#vuppo-settings-categories');
+  const content = $('#vuppo-settings-content');
+  if (!categoriesNav || !content) return;
+  const query = ($('#vuppo-settings-search')?.value || '').trim().toLowerCase();
+  const categories = SETTINGS_SCHEMA.map((category) => ({
+    ...category,
+    options: category.options.filter((option) => !query || `${option.label} ${option.description || ''}`.toLowerCase().includes(query)),
+  }));
+  categoriesNav.innerHTML = categories.map((category) => `<button type="button" class="settings-category-item ${!query && category.id === settingsActiveCategory ? 'active' : ''}" data-settings-category="${category.id}">${category.icon}<span>${category.label}</span>${query ? `<span class="settings-category-count">${category.options.length}</span>` : ''}</button>`).join('');
+  if (query) {
+    const matches = categories.filter((category) => category.options.length);
+    content.innerHTML = matches.length ? matches.map((category) => renderSettingsSection(category, true)).join('') : `<p class="settings-empty">Nenhuma configuração encontrada para "${escapeHtml(query)}".</p>`;
+    return;
+  }
+  const activeCategory = SETTINGS_SCHEMA.find((category) => category.id === settingsActiveCategory) || SETTINGS_SCHEMA[0];
+  content.innerHTML = activeCategory.id === 'about'
+    ? `<section class="settings-section"><p class="settings-breadcrumb">Configurações › Sobre</p><h3 class="settings-section-title">Sobre</h3><div class="settings-about"><div class="settings-about-mark">V</div><div><strong>Vuppo</strong><span>Versão ${VUPPO_VERSION}</span></div></div><p class="settings-about-copy">Editor de código estilo VS Code com auditoria de segurança integrada: explore e edite seus arquivos, use terminal e Git integrados, converse no Chat e acompanhe os riscos no painel Security Problems.</p></section>`
+    : renderSettingsSection(activeCategory, false);
+}
+
+function renderSettingsSection(category, fromSearch) {
+  const rows = category.options.map((option) => renderSettingsRow(option)).join('');
+  return `<section class="settings-section" data-settings-section="${category.id}"><p class="settings-breadcrumb">Configurações › ${category.label}${fromSearch ? ' › Resultados' : ''}</p><h3 class="settings-section-title">${category.label}</h3>${rows}</section>`;
+}
+
+function openVuppoSettings(category) {
+  ensureSettingsOverlay();
+  if (category) settingsActiveCategory = category;
+  const searchInput = $('#vuppo-settings-search');
+  if (searchInput) searchInput.value = '';
+  renderSettingsContent();
+  settingsOverlayElement.classList.remove('hidden');
+  searchInput?.focus();
+}
+
+function closeVuppoSettings() {
+  settingsOverlayElement?.classList.add('hidden');
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && settingsOverlayElement && !settingsOverlayElement.classList.contains('hidden')) closeVuppoSettings();
+});
+
+applySettings();
 
 function readRecentProjects() {
   try {
@@ -1194,34 +1697,80 @@ function normalizeTreePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
 }
 
+// Ordenação padrão do Explorer do VS Code: pastas antes dos arquivos e comparação de
+// nomes sem diferenciar maiúsculas de minúsculas (equivalente a compareFileNamesDefault).
+function compareTreeEntries(first, second) {
+  const one = String(first ?? '');
+  const other = String(second ?? '');
+  if (one === other) return 0;
+  if (!one) return -1;
+  if (!other) return 1;
+  const lowerOne = one.toLowerCase();
+  const lowerOther = other.toLowerCase();
+  if (lowerOne === lowerOther) return one < other ? -1 : 1;
+  return lowerOne < lowerOther ? -1 : 1;
+}
+
 function parentTreePath(value) {
   const parts = normalizeTreePath(value).split('/');
   parts.pop();
   return parts.join('/');
 }
 
-function explorerCreateValidation(kind, value, targetFolder) {
-  const raw = String(value || '');
-  if (!raw.trim()) return { valid: false, message: '' };
-  if (/^[A-Za-z]:|^[\\/]/.test(raw.trim())) return { valid: false, message: 'Use um caminho relativo à pasta do projeto.' };
-  const normalized = normalizeTreePath(raw.trim());
-  const segments = normalized.split('/').filter(Boolean);
-  if (!segments.length) return { valid: false, message: '' };
-  if (segments.some((part) => part === '.' || part === '..')) return { valid: false, message: 'O nome não pode conter "." ou "..".' };
-  if (segments.some((part) => /[:*?"<>|]/.test(part))) return { valid: false, message: 'O nome contém caracteres inválidos: : * ? " < > |' };
+const WINDOWS_RESERVED_ENTRY_NAMES = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const INVALID_ENTRY_CHARACTERS = /[<>:"|?*\u0000-\u001F]/;
+
+function getWellFormedEntryName(value) {
+  return String(value ?? '').replace(/\t/g, '').replace(/[\\/]+$/, '');
+}
+
+function isValidEntrySegment(segment) {
+  if (!segment || segment.length > 255) return false;
+  if (INVALID_ENTRY_CHARACTERS.test(segment)) return false;
+  if (/[. ]$/.test(segment)) return false;
+  return !WINDOWS_RESERVED_ENTRY_NAMES.test(segment);
+}
+
+function trimEntryName(name) {
+  return name.length > 255 ? `${name.slice(0, 255)}...` : name;
+}
+
+// Regras equivalentes às do VS Code (validateFileName + hasValidBasename do Windows).
+function explorerCreateValidation(kind, value, targetFolder, options = {}) {
+  const raw = String(value ?? '');
   const root = normalizeTreePath(targetFolder);
+  const ignorePath = normalizeTreePath(options.ignorePath).toLowerCase();
+  const invalid = (message) => ({ valid: false, severity: 'error', message, path: '', isFolder: false });
+  const name = getWellFormedEntryName(raw);
+  if (!name || /^\s+$/.test(name)) return invalid('Um nome de arquivo ou pasta deve ser fornecido.');
+  if (/^[\\/]/.test(name)) return invalid('Um nome de arquivo ou pasta não pode começar com uma barra.');
+  const segments = name.split(/[\\/]/).filter(Boolean);
+  if (!segments.length) return invalid('Um nome de arquivo ou pasta deve ser fornecido.');
   const fullPath = root ? `${root}/${segments.join('/')}` : segments.join('/');
-  const name = segments[segments.length - 1];
+  const entryName = segments[segments.length - 1];
+  const isFolder = kind === 'folder' || /[\\/]$/.test(raw);
   const files = (currentReport?.files || []).map((file) => normalizeTreePath(file.file).toLowerCase());
   const directories = (currentReport?.directories || []).map((directory) => normalizeTreePath(directory).toLowerCase());
   const fileAncestor = segments
     .slice(0, -1)
     .map((_, index) => (root ? `${root}/${segments.slice(0, index + 1).join('/')}` : segments.slice(0, index + 1).join('/')))
     .find((ancestor) => files.includes(ancestor.toLowerCase()));
-  if (fileAncestor) return { valid: false, message: `"${fileAncestor.split('/').pop()}" já é um arquivo. Escolha outra pasta.` };
-  if (files.includes(fullPath.toLowerCase()) || directories.includes(fullPath.toLowerCase())) return { valid: false, message: `"${name}" já existe. Escolha outro nome.` };
-  const isFolder = kind === 'folder' || /[\\/]\s*$/.test(raw);
-  return { valid: true, message: '', path: fullPath, isFolder };
+  if (fileAncestor) return invalid(`"${fileAncestor.split('/').pop()}" já é um arquivo. Escolha outra pasta.`);
+  if (files.includes(fullPath.toLowerCase()) || directories.includes(fullPath.toLowerCase())) {
+    if (fullPath.toLowerCase() !== ignorePath) return invalid(`Um arquivo ou pasta "${entryName}" já existe neste local. Escolha outro nome.`);
+  }
+  const invalidSegment = segments.find((segment) => !isValidEntrySegment(segment));
+  if (invalidSegment) return invalid(`O nome "${trimEntryName(invalidSegment)}" não é válido como nome de arquivo ou pasta. Escolha outro nome.`);
+  if (segments.some((segment) => /^\s|\s$/.test(segment))) return { valid: true, severity: 'warning', message: 'Espaço em branco no início ou no fim do nome detectado.', path: fullPath, isFolder };
+  return { valid: true, severity: null, message: '', path: fullPath, isFolder };
+}
+
+function currentExplorerCreateTarget() {
+  const folderRow = document.querySelector('.workspace .tree-folder-item.selected');
+  if (folderRow) return normalizeTreePath(folderRow.dataset.folder);
+  const fileRow = document.querySelector('.workspace .tree-file.selected');
+  if (fileRow) return parentTreePath(fileRow.dataset.file);
+  return '';
 }
 
 function revealExplorerSidebar() {
@@ -1261,6 +1810,7 @@ function cancelInlineCreate() {
   activeInlineCreate = null;
   session.row.remove();
   session.error.remove();
+  session.onCancel?.();
 }
 
 function revealCreatedEntry(relativePath, isFolder) {
@@ -1279,7 +1829,7 @@ function revealCreatedEntry(relativePath, isFolder) {
   if (fileButton) selectWorkspaceFile(fileButton.dataset.file);
 }
 
-function startExplorerCreate(kind, targetFolder = '') {
+function startExplorerCreate(kind, targetFolder = '', options = {}) {
   const workspace = document.querySelector('.workspace');
   const fileTree = workspace?.querySelector('.file-tree');
   if (!workspace || !fileTree || !currentReport) return;
@@ -1295,48 +1845,90 @@ function startExplorerCreate(kind, targetFolder = '') {
   }
   if (!container) return;
   const isFolder = kind === 'folder';
-  const level = targetPath ? targetPath.split('/').length : 0;
+  const levelFromAnchor = Number.parseInt(options.anchorRow?.style.getPropertyValue('--tree-level') || '', 10);
+  const level = Number.isNaN(levelFromAnchor) ? (targetPath ? targetPath.split('/').length : 0) : levelFromAnchor;
   const row = document.createElement('div');
   row.className = 'tree-create-row';
   row.style.setProperty('--tree-level', String(level));
-  row.innerHTML = `<input class="tree-create-input" type="text" autocomplete="off" spellcheck="false" aria-label="${isFolder ? 'Nome da pasta' : 'Nome do arquivo'}" />`;
+  row.innerHTML = `<span class="tree-create-icon">${isFolder ? '<img src="assets/material-icons/folder.svg" class="tree-folder-icon" alt="" />' : fileIconMarkup('')}</span><input class="tree-create-input" type="text" autocomplete="off" spellcheck="false" aria-label="Digite o nome. Pressione Enter para confirmar ou Escape para cancelar." />`;
   const error = document.createElement('div');
   error.className = 'tree-create-error hidden';
+  error.setAttribute('role', 'alert');
   error.style.setProperty('--tree-level', String(level));
-  container.prepend(error);
-  container.prepend(row);
+  if (options.anchorRow?.parentElement) {
+    // Renomear: o campo ocupa o lugar do item, como no VS Code.
+    options.anchorRow.parentElement.insertBefore(row, options.anchorRow.nextSibling);
+    row.parentElement.insertBefore(error, row.nextSibling);
+    options.anchorRow.classList.add('tree-row-editing');
+  } else {
+    container.prepend(error);
+    container.prepend(row);
+  }
   const input = row.querySelector('.tree-create-input');
-  const session = { row, error, input, targetPath, kind };
+  const icon = row.querySelector('.tree-create-icon');
+  const session = { row, error, input, targetPath, kind, onCancel: () => options.anchorRow?.classList.remove('tree-row-editing') };
   activeInlineCreate = session;
-  const showError = (message) => {
-    error.textContent = message || '';
-    error.classList.toggle('hidden', Boolean(message));
+  let selectionState = 'prefix';
+  const validate = () => explorerCreateValidation(kind, input.value, targetPath, { ignorePath: options.renameFrom });
+  if (options.value) {
+    input.value = options.value;
+    const dotIndex = input.value.lastIndexOf('.');
+    if (isFolder || dotIndex <= 0) input.select();
+    else input.setSelectionRange(0, dotIndex);
+  }
+  const showMessage = (validation) => {
+    error.textContent = validation?.message || '';
+    error.classList.toggle('hidden', !error.textContent);
+    error.classList.toggle('warning', validation?.severity === 'warning');
+    input.classList.toggle('invalid', validation?.severity === 'error');
+  };
+  const updateIcon = () => {
+    if (isFolder) return;
+    const typed = getWellFormedEntryName(input.value).split(/[\\/]/).pop() || '';
+    icon.innerHTML = fileIconMarkup(typed);
   };
   const submit = async () => {
-    const result = explorerCreateValidation(kind, input.value, targetPath);
-    if (!result.valid) {
-      showError(result.message || (isFolder ? 'Digite o nome da pasta.' : 'Digite o nome do arquivo.'));
+    const validation = validate();
+    if (!validation.valid) {
+      showMessage(validation);
       input.focus();
+      return;
+    }
+    const renameFrom = normalizeTreePath(options.renameFrom);
+    if (renameFrom && renameFrom.toLowerCase() === normalizeTreePath(validation.path).toLowerCase()) {
+      cancelInlineCreate();
       return;
     }
     input.disabled = true;
     try {
-      if (result.isFolder) await window.vuppo.createFolder({ projectPath: currentReport.projectPath, relativePath: result.path });
-      else await window.vuppo.createFile({ projectPath: currentReport.projectPath, relativePath: result.path });
+      if (renameFrom) await window.vuppo.renameEntry({ projectPath: currentReport.projectPath, relativePath: renameFrom, nextRelativePath: validation.path });
+      else if (validation.isFolder) await window.vuppo.createFolder({ projectPath: currentReport.projectPath, relativePath: validation.path });
+      else await window.vuppo.createFile({ projectPath: currentReport.projectPath, relativePath: validation.path });
       cancelInlineCreate();
       await analyzeProject(currentReport.projectPath);
-      revealCreatedEntry(result.path, result.isFolder);
+      revealCreatedEntry(validation.path, validation.isFolder);
     } catch (createError) {
       input.disabled = false;
-      showError(createError.message || 'Não foi possível criar.');
+      showMessage({ severity: 'error', message: createError.message || (normalizeTreePath(options.renameFrom) ? 'Não foi possível renomear.' : 'Não foi possível criar.') });
       input.focus();
     }
   };
   input.addEventListener('input', () => {
-    const result = explorerCreateValidation(kind, input.value, targetPath);
-    showError(result.valid ? '' : result.message);
+    showMessage(validate());
+    updateIcon();
   });
   input.addEventListener('keydown', (event) => {
+    if (event.key === 'F2') {
+      const dotIndex = input.value.lastIndexOf('.');
+      if (!isFolder && dotIndex > 0) {
+        event.preventDefault();
+        selectionState = selectionState === 'prefix' ? 'all' : selectionState === 'all' ? 'suffix' : 'prefix';
+        if (selectionState === 'prefix') input.setSelectionRange(0, dotIndex);
+        else if (selectionState === 'all') input.select();
+        else input.setSelectionRange(dotIndex + 1, input.value.length);
+      }
+      return;
+    }
     if (event.key === 'Enter') {
       event.preventDefault();
       submit();
@@ -1349,11 +1941,159 @@ function startExplorerCreate(kind, targetFolder = '') {
   });
   input.addEventListener('blur', () => {
     setTimeout(() => {
-      if (activeInlineCreate === session && !session.input.disabled) cancelInlineCreate();
+      if (activeInlineCreate !== session || session.input.disabled) return;
+      if (document.activeElement === session.input) return;
+      if (document.activeElement?.closest?.('.tree-context-menu, .explorer-menu, .workspace-menu-dropdown, .editor-tabs-menu, .recent-menu')) return;
+      const validation = validate();
+      if (validation.valid) submit();
+      else cancelInlineCreate();
     }, 0);
   });
+  showMessage(validate());
   row.scrollIntoView({ block: 'nearest' });
   input.focus();
+}
+
+function findTreeEntryRow(relativePath) {
+  const normalized = normalizeTreePath(relativePath).toLowerCase();
+  if (!normalized) return null;
+  const folderRow = [...document.querySelectorAll('.tree-folder-item')]
+    .find((item) => normalizeTreePath(item.dataset.folder).toLowerCase() === normalized);
+  if (folderRow) return folderRow;
+  return [...document.querySelectorAll('.tree-file')]
+    .find((button) => normalizeTreePath(button.dataset.file).toLowerCase() === normalized) || null;
+}
+
+// Renomear no próprio lugar da árvore, como o F2 do VS Code (com o nome sem a extensão selecionado).
+function startExplorerRename(relativePath) {
+  const normalized = normalizeTreePath(relativePath);
+  if (!normalized || !currentReport) return;
+  const row = findTreeEntryRow(normalized);
+  if (!row) return;
+  const isFolder = row.classList.contains('tree-folder-item');
+  startExplorerCreate(isFolder ? 'folder' : 'file', parentTreePath(normalized), {
+    value: normalized.split('/').pop(),
+    renameFrom: normalized,
+    anchorRow: row
+  });
+}
+
+let explorerClipboard = null;
+
+async function copyExplorerEntry(relativePath, isFolder) {
+  const normalized = normalizeTreePath(relativePath);
+  if (!normalized || !currentReport) return;
+  explorerClipboard = { relativePath: normalized, isFolder, projectPath: currentReport.projectPath };
+  try { await navigator.clipboard?.writeText(normalized); } catch { /* área de transferência do sistema indisponível */ }
+}
+
+async function pasteExplorerEntry(targetFolder) {
+  if (!currentReport || !explorerClipboard) return;
+  if (explorerClipboard.projectPath !== currentReport.projectPath) {
+    alert('Copie um arquivo ou pasta deste projeto para colar aqui.');
+    return;
+  }
+  const folder = normalizeTreePath(targetFolder);
+  const name = explorerClipboard.relativePath.split('/').pop();
+  const destination = folder ? `${folder}/${name}` : name;
+  const copy = (replace) => window.vuppo.copyEntry({
+    projectPath: currentReport.projectPath,
+    sourcePath: explorerClipboard.relativePath,
+    targetFolder: folder,
+    replace
+  });
+  try {
+    await copy(false);
+  } catch (error) {
+    if (!/já existe/i.test(error.message || '')) {
+      alert(error.message || 'Não foi possível colar.');
+      return;
+    }
+    if (!confirm(`Um arquivo ou pasta "${name}" já existe neste local. Deseja substituir?`)) return;
+    try {
+      await copy(true);
+    } catch (replaceError) {
+      alert(replaceError.message || 'Não foi possível colar.');
+      return;
+    }
+  }
+  await analyzeProject(currentReport.projectPath);
+  revealCreatedEntry(destination, explorerClipboard.isFolder);
+}
+
+function confirmExplorerDelete(name) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'explorer-dialog-overlay';
+    overlay.innerHTML = `<div class="explorer-dialog" role="dialog" aria-modal="true" aria-label="Excluir">
+      <h3>Excluir "${escapeHtml(name)}"?</h3>
+      <p>Você está prestes a excluir <strong>${escapeHtml(name)}</strong> e todo o seu conteúdo.</p>
+      <p>O item será enviado para a Lixeira.</p>
+      <div class="explorer-dialog-actions"><button type="button" class="explorer-dialog-cancel">Cancelar</button><button type="button" class="explorer-dialog-confirm">Mover para a Lixeira</button></div>
+    </div>`;
+    const onKeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); close(false); } };
+    const close = (result) => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    };
+    overlay.querySelector('.explorer-dialog-cancel').addEventListener('click', () => close(false));
+    overlay.querySelector('.explorer-dialog-confirm').addEventListener('click', () => close(true));
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) close(false); });
+    document.addEventListener('keydown', onKeydown);
+    document.body.appendChild(overlay);
+    overlay.querySelector('.explorer-dialog-confirm').focus();
+  });
+}
+
+async function deleteExplorerEntry(relativePath) {
+  const normalized = normalizeTreePath(relativePath);
+  if (!normalized || !currentReport) return;
+  const name = normalized.split('/').pop();
+  if (!(await confirmExplorerDelete(name))) return;
+  try {
+    await window.vuppo.deleteEntry({ projectPath: currentReport.projectPath, relativePath: normalized, useTrash: true });
+    await analyzeProject(currentReport.projectPath);
+  } catch (error) {
+    alert(error.message || 'Não foi possível excluir.');
+  }
+}
+
+const chatContextEntries = [];
+
+// "Adicionar ao chat": anexa o arquivo ou a pasta como contexto do chat (como no VS Code).
+function renderChatContextChips() {
+  const composer = document.querySelector('.workspace [data-feature-panel="chat"] .chat-composer');
+  if (!composer) return;
+  for (let index = chatContextEntries.length - 1; index >= 0; index -= 1) {
+    if (chatContextEntries[index].projectPath !== currentReport?.projectPath) chatContextEntries.splice(index, 1);
+  }
+  let chips = composer.querySelector('.chat-context-chips');
+  if (!chips) {
+    chips = document.createElement('div');
+    chips.className = 'chat-context-chips';
+    composer.prepend(chips);
+  }
+  chips.innerHTML = chatContextEntries.map((entry, index) => `<span class="chat-context-chip" data-chat-context="${index}"><i class="codicon ${entry.isFolder ? 'codicon-folder' : 'codicon-file'}" aria-hidden="true"></i><span class="chat-context-name">${escapeHtml(entry.path)}</span><button type="button" class="chat-context-remove" title="Remover do contexto" aria-label="Remover do contexto">×</button></span>`).join('');
+  chips.classList.toggle('hidden', !chatContextEntries.length);
+  chips.querySelectorAll('.chat-context-remove').forEach((button) => button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const index = Number(button.closest('[data-chat-context]')?.dataset.chatContext);
+    if (Number.isInteger(index)) chatContextEntries.splice(index, 1);
+    renderChatContextChips();
+  }));
+}
+
+function addExplorerEntryToChat(relativePath, isFolder) {
+  const normalized = normalizeTreePath(relativePath);
+  if (!normalized || !currentReport) return;
+  if (!chatContextEntries.some((entry) => entry.path === normalized)) {
+    chatContextEntries.push({ path: normalized, isFolder, projectPath: currentReport.projectPath });
+  }
+  const chatPanel = document.querySelector('.workspace [data-feature-panel="chat"]');
+  if (chatPanel?.classList.contains('hidden')) document.querySelector('.workspace .top-action-button[title="Chat"]')?.click();
+  renderChatContextChips();
+  document.querySelector('.workspace [data-feature-panel="chat"] .chat-input textarea')?.focus();
 }
 
 function closeWorkspaceFolder() {
@@ -1423,10 +2163,124 @@ $('#empty-choose').addEventListener('click', chooseProject);
 $('#clone-button').addEventListener('click', () => setCloneModal(true));
 $('#ssh-button').addEventListener('click', () => alert('A conexão via SSH estará disponível em breve.'));
 $('#confirm-clone').addEventListener('click', cloneRepo);
+const openHomeFeature = async (feature) => {
+  if (!currentReport) {
+    if (feature !== 'terminal') { alert('Abra um projeto para usar este recurso.'); return; }
+    try {
+      const stored = readRecentProjects()[0];
+      if (stored) await analyzeProject(stored);
+      else await chooseProject();
+    } catch { return; }
+    if (!currentReport) return;
+  }
+  if (document.querySelector('.workspace')?.classList.contains('hidden')) return;
+  const target = document.querySelector(`.workspace .top-action-button[title="${feature}"]`);
+  if (target && !target.classList.contains('active')) target.click();
+};
+$('#home-preview-button')?.addEventListener('click', () => openHomeFeature('Preview'));
+$('#home-terminal-button')?.addEventListener('click', () => openHomeFeature('Terminal'));
+$('#home-chat-button')?.addEventListener('click', () => openHomeFeature('Chat'));
+const homeMenus = document.querySelector('.home-menus');
+if (homeMenus) {
+  homeMenus.querySelectorAll('.workspace-menu-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      const menu = button.closest('.workspace-menu');
+      const isOpen = menu.classList.toggle('is-open');
+      homeMenus.querySelectorAll('.workspace-menu').forEach((item) => { if (item !== menu) item.classList.remove('is-open'); });
+      homeMenus.querySelectorAll('.workspace-menu-button').forEach((item) => item.setAttribute('aria-expanded', item === button && isOpen ? 'true' : 'false'));
+    });
+  });
+  document.addEventListener('click', (event) => {
+    if (!homeMenus.contains(event.target)) homeMenus.querySelectorAll('.workspace-menu').forEach((item) => item.classList.remove('is-open'));
+  });
+  homeMenus.querySelectorAll('[data-home-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      button.closest('.workspace-menu').classList.remove('is-open');
+      const view = button.dataset.homeView;
+      if (!currentReport) { alert('Abra um projeto para usar este recurso.'); return; }
+      if (document.querySelector('.workspace')?.classList.contains('hidden')) return;
+      const target = document.querySelector(`.workspace [data-workspace-view="${view}"]`);
+      if (target) target.click();
+    });
+  });
+  homeMenus.querySelectorAll('[data-home-file-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const action = button.dataset.homeFileAction;
+      button.closest('.workspace-menu').classList.remove('is-open');
+      const hasProject = Boolean(currentReport) && !document.querySelector('.workspace')?.classList.contains('hidden');
+      switch (action) {
+        case 'new-file':
+          if (!hasProject) { alert('Abra um projeto para criar arquivos.'); return; }
+          document.querySelector('.workspace [data-explorer-action="new-file"]')?.click();
+          break;
+        case 'new-window': await window.vuppo.openNewWindow(); break;
+        case 'open-file':
+          if (!hasProject) { alert('Abra um projeto para abrir arquivos.'); return; }
+          await openFileFromDialog();
+          break;
+        case 'open-folder':
+        case 'open-project': await chooseProject(); break;
+        case 'open-recent':
+          if (!hasProject) { alert('Abra um projeto para ver os recentes.'); return; }
+          document.querySelector('.workspace [data-file-action="open-recent"]')?.click();
+          break;
+        case 'save':
+        case 'save-all':
+          if (!hasProject) { alert('Abra um projeto para salvar.'); return; }
+          saveActiveEditor();
+          break;
+        case 'save-as':
+          if (!hasProject) { alert('Abra um projeto para salvar.'); return; }
+          await saveActiveEditorAs();
+          break;
+        case 'close-editor':
+          if (hasProject) closeActiveEditor();
+          break;
+        case 'close-folder':
+          if (hasProject) closeWorkspaceFolder();
+          break;
+        case 'exit': window.vuppo.closeWindow(); break;
+        default: break;
+      }
+    });
+  });
+}
+const homeProfileButton = $('#home-profile-button');
+const homeProfileMenu = $('#home-profile-menu');
+if (homeProfileButton && homeProfileMenu) {
+  homeProfileButton.addEventListener('click', () => homeProfileMenu.classList.toggle('hidden'));
+  homeProfileMenu.querySelector('.profile-close').addEventListener('click', () => homeProfileMenu.classList.add('hidden'));
+  homeProfileMenu.querySelector('[data-home-profile-action="settings"]').addEventListener('click', () => {
+    homeProfileMenu.classList.add('hidden');
+    openVuppoSettings();
+  });
+  document.addEventListener('click', (event) => {
+    if (!homeProfileMenu.contains(event.target) && event.target !== homeProfileButton && !homeProfileButton.contains(event.target)) homeProfileMenu.classList.add('hidden');
+  });
+}
+const homeMinimize = $('#home-minimize');
+const homeMaximize = $('#home-maximize');
+const homeClose = $('#home-close');
+const setHomeWindowState = (isMaximized) => {
+  const icon = homeMaximize?.querySelector('.window-icon');
+  if (icon) icon.className = `window-icon ${isMaximized ? 'restore-icon' : 'maximize-icon'}`;
+  if (homeMaximize) {
+    homeMaximize.title = isMaximized ? 'Restaurar' : 'Maximizar';
+    homeMaximize.setAttribute('aria-label', isMaximized ? 'Restaurar' : 'Maximizar');
+  }
+};
+if (homeMinimize) homeMinimize.addEventListener('click', () => window.vuppo.minimizeWindow());
+if (homeClose) homeClose.addEventListener('click', () => window.vuppo.closeWindow());
+if (homeMaximize) {
+  homeMaximize.addEventListener('click', () => {
+    window.vuppo.toggleMaximizeWindow().then((isMaximized) => setHomeWindowState(isMaximized));
+  });
+  window.vuppo.isWindowMaximized().then((isMaximized) => setHomeWindowState(isMaximized));
+}
 $('#close-clone').addEventListener('click', () => setCloneModal(false));
 $('#cancel-clone').addEventListener('click', () => setCloneModal(false));
 $('#repo-url').addEventListener('keydown', (event) => { if (event.key === 'Enter') cloneRepo(); });
-$('#settings-button').addEventListener('click', () => alert('As configurações estarão disponíveis em breve.'));
+$('#settings-button')?.addEventListener('click', () => openVuppoSettings());
 const homePlan = $('.vuppo-home-plan');
 if (homePlan && !$('#upgrade-button')) homePlan.innerHTML = 'Free Plan <span>·</span> <button type="button" id="upgrade-button">Upgrade</button>';
 let plansModal = $('#plans-modal');

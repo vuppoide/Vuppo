@@ -67,6 +67,76 @@ app.whenReady().then(() => {
         resolve(result.filePaths[0]);
       });
     });
+  function runGit(args, cwd) {
+    return new Promise((resolve, reject) => {
+      execFile('git', args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) reject(new Error(stderr.trim() || error.message));
+        else resolve(stdout);
+      });
+    });
+  }
+  function parseGitStatus(output) {
+    const changes = [];
+    output.split('\n').forEach((line) => {
+      if (!line.trim()) return;
+      const x = line[0];
+      const y = line[1];
+      let file = line.slice(3).trim();
+      if (file.startsWith('"') && file.endsWith('"')) file = file.slice(1, -1);
+      changes.push({ path: file, x, y, untracked: x === '?' && y === '?' });
+    });
+    return changes;
+  }
+  ipcMain.handle('git-status', async (_event, projectPath) => {
+    if (!projectPath || !fs.existsSync(projectPath)) throw new Error('Projeto não encontrado.');
+    try {
+      const output = await runGit(['status', '--porcelain', '-b', '--untracked-files=all'], projectPath);
+      const lines = output.split('\n').filter((line) => line.trim());
+      const branchLine = lines.find((line) => line.startsWith('## '));
+      const branchMatch = branchLine ? branchLine.slice(3).match(/^([^.\s]+)/) : null;
+      return {
+        isRepo: true,
+        branch: branchMatch ? branchMatch[1] : '',
+        changes: parseGitStatus(lines.filter((line) => !line.startsWith('## ')).join('\n')),
+      };
+    } catch {
+      return { isRepo: false, branch: '', changes: [] };
+    }
+  });
+  ipcMain.handle('git-stage', async (_event, { projectPath, path: filePath }) => {
+    if (!projectPath || !filePath) throw new Error('Parâmetros inválidos.');
+    await runGit(['add', '--', filePath], projectPath);
+    return true;
+  });
+  ipcMain.handle('git-unstage', async (_event, { projectPath, path: filePath }) => {
+    if (!projectPath || !filePath) throw new Error('Parâmetros inválidos.');
+    await runGit(['reset', 'HEAD', '--', filePath], projectPath);
+    return true;
+  });
+  ipcMain.handle('git-discard', async (_event, { projectPath, path: filePath, untracked }) => {
+    if (!projectPath || !filePath) throw new Error('Parâmetros inválidos.');
+    if (untracked) {
+      const root = path.resolve(projectPath);
+      const target = path.resolve(root, filePath);
+      if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Caminho fora do projeto.');
+      await shell.trashItem(target);
+      return true;
+    }
+    await runGit(['checkout', '--', filePath], projectPath);
+    return true;
+  });
+  ipcMain.handle('git-commit', async (_event, { projectPath, message }) => {
+    if (!projectPath || !message || !message.trim()) throw new Error('Digite uma mensagem para o commit.');
+    await runGit(['commit', '-m', message.trim()], projectPath);
+    return true;
+  });
+  ipcMain.handle('git-init', async (_event, projectPath) => {
+    if (!projectPath || !fs.existsSync(projectPath)) throw new Error('Projeto não encontrado.');
+    await runGit(['init'], projectPath);
+    return true;
+  });
+
+  ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
   });
 
   ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
@@ -120,6 +190,42 @@ app.whenReady().then(() => {
     if (fs.existsSync(target)) throw new Error('Já existe uma pasta com esse nome.');
     await fs.promises.mkdir(target, { recursive: true });
     return target;
+  });
+  ipcMain.handle('copy-entry', async (_event, { projectPath, sourcePath, targetFolder, replace }) => {
+    const root = path.resolve(projectPath);
+    const source = path.resolve(root, sourcePath);
+    if (source === root || !source.startsWith(`${root}${path.sep}`)) throw new Error('Origem fora do projeto.');
+    if (!fs.existsSync(source)) throw new Error('O item copiado não existe mais.');
+    const destination = path.resolve(root, targetFolder || '', path.basename(source));
+    if (destination !== root && !destination.startsWith(`${root}${path.sep}`)) throw new Error('Destino fora do projeto.');
+    if (destination === source) throw new Error('Já existe um arquivo ou pasta com esse nome neste local.');
+    if (fs.existsSync(destination)) {
+      if (!replace) throw new Error('Já existe um arquivo ou pasta com esse nome neste local.');
+      await fs.promises.rm(destination, { recursive: true, force: true });
+    }
+    await fs.promises.cp(source, destination, { recursive: true });
+    return path.relative(root, destination);
+  });
+  ipcMain.handle('rename-entry', async (_event, { projectPath, relativePath, nextRelativePath }) => {
+    const root = path.resolve(projectPath);
+    const source = path.resolve(root, relativePath);
+    const target = path.resolve(root, nextRelativePath);
+    if (source === root || !source.startsWith(`${root}${path.sep}`)) throw new Error('Caminho fora do projeto.');
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) throw new Error('Caminho fora do projeto.');
+    if (!fs.existsSync(source)) throw new Error('O item não existe mais.');
+    if (fs.existsSync(target)) throw new Error('Já existe um arquivo ou pasta com esse nome neste local.');
+    await fs.promises.mkdir(path.dirname(target), { recursive: true });
+    await fs.promises.rename(source, target);
+    return path.relative(root, target);
+  });
+  ipcMain.handle('delete-entry', async (_event, { projectPath, relativePath, useTrash }) => {
+    const root = path.resolve(projectPath);
+    const target = path.resolve(root, relativePath);
+    if (target === root || !target.startsWith(`${root}${path.sep}`)) throw new Error('Caminho fora do projeto.');
+    if (!fs.existsSync(target)) throw new Error('O item não existe mais.');
+    if (useTrash === false) await fs.promises.rm(target, { recursive: true, force: true });
+    else await shell.trashItem(target);
+    return true;
   });
   ipcMain.handle('open-file-dialog', async () => {
     const result = await dialog.showOpenDialog({ title: 'Abrir arquivo', properties: ['openFile'] });
