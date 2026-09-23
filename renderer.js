@@ -332,6 +332,8 @@ function resolveProjectPreviewUrl() {
   return 'http://localhost:3000';
 }
 
+let editorTabsMenuGuardsInstalled = false;
+
 function updateEditorTabsMenuVisibility() {
   const editorTabs = document.querySelector('.editor-tabs');
   const actions = editorTabs?.querySelector('.editor-tabs-actions');
@@ -384,6 +386,20 @@ function setupWorkspaceControls(workspace) {
     }
     if (tab.dataset.file) selectWorkspaceFile(tab.dataset.file);
   });
+  if (!editorTabsMenuGuardsInstalled) {
+    editorTabsMenuGuardsInstalled = true;
+    document.addEventListener('click', (event) => {
+      const tabsMenu = document.querySelector('.editor-tabs-menu');
+      if (!tabsMenu || tabsMenu.classList.contains('hidden')) return;
+      if (tabsMenu.contains(event.target) || event.target.closest?.('.editor-tabs-menu-button')) return;
+      tabsMenu.classList.add('hidden');
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      const tabsMenu = document.querySelector('.editor-tabs-menu');
+      if (tabsMenu && !tabsMenu.classList.contains('hidden')) tabsMenu.classList.add('hidden');
+    });
+  }
   const openEditorsHeading = workspace.querySelector('.explorer-section-heading');
   if (openEditorsHeading) openEditorsHeading.insertAdjacentHTML('beforeend', '<button type="button" class="open-editors-menu-button" title="Mais ações" aria-label="Mais ações">...</button><div class="open-editors-menu hidden"><button type="button" data-open-editor-action="close">Fechar editor</button><button type="button" data-open-editor-action="close-all">Fechar todos</button></div>');
   workspace.querySelector('.workspace-brand')?.remove();
@@ -1071,6 +1087,7 @@ function setupWorkspaceControls(workspace) {
       await runFileAction(button.dataset.fileAction, button);
     });
   });
+  syncWorkspaceFileMenu();
   securityPanel.querySelector('.security-panel-close').addEventListener('click', () => {
     securityPanel.classList.add('is-collapsed');
     body.classList.add('security-closed');
@@ -1313,6 +1330,18 @@ function selectWorkspaceFile(file) {
   renderWorkspaceFile(fileData);
 }
 
+function syncWorkspaceFileMenu() {
+  const workspace = document.querySelector('.workspace');
+  if (!workspace) return;
+  const hasOpenEditor = Boolean(workspace.querySelector('.editor-tab'));
+  const canSave = hasOpenEditor && Boolean(workspace.querySelector('.code-editor'));
+  const state = { save: canSave, 'save-as': canSave, 'save-all': canSave, 'close-editor': hasOpenEditor };
+  Object.entries(state).forEach(([action, enabled]) => {
+    const button = workspace.querySelector(`[data-file-action="${action}"]`);
+    if (button) button.disabled = !enabled;
+  });
+}
+
 function openWorkspaceTab(file) {
   const tabs = document.querySelector('.editor-tabs');
   if (!tabs) return;
@@ -1329,6 +1358,7 @@ function openWorkspaceTab(file) {
   updateEditorLabels(tab, file);
   tabs.querySelectorAll('.editor-tab').forEach((item) => item.classList.toggle('active', item === tab));
   updateEditorTabsMenuVisibility();
+  syncWorkspaceFileMenu();
   tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 }
 
@@ -1352,6 +1382,7 @@ function closeEditorTab(file) {
   const wasActive = tab.classList.contains('active');
   tab.remove();
   updateEditorTabsMenuVisibility();
+  syncWorkspaceFileMenu();
   if (!wasActive) return;
   const nextTab = tabs.querySelector('.editor-tab:last-child');
   if (nextTab) selectWorkspaceFile(nextTab.dataset.file);

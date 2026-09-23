@@ -314,6 +314,8 @@ button { cursor:pointer; }
 .workspace-menu.is-open .workspace-menu-dropdown { display:block; }
 .workspace-menu-dropdown button { width:100%; display:flex; align-items:center; gap:9px; border:0; border-radius:3px; padding:9px 10px; color:#cccccc; background:transparent; text-align:left; font:11px Manrope,Arial,sans-serif; }
 .workspace-menu-dropdown button:hover { color:#f2f2f2; background:#333333; }
+.workspace-menu-dropdown button:disabled { color:#6d6d6d; background:transparent; cursor:default; }
+.workspace-menu-dropdown button:disabled:hover { color:#6d6d6d; background:transparent; }
 .workspace-menu-dropdown svg { width:16px; height:16px; flex:0 0 16px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.6; }
 .security-panel-close { width:24px; height:24px; border:1px solid #454545; border-radius:3px; color:#a9a9a9; background:transparent; font-size:12px; line-height:1; }
 .security-panel-close:hover { color:#f0f0f0; border-color:#707070; background:#303030; }
@@ -420,7 +422,7 @@ button { cursor:pointer; }
 .editor-empty span { color:#777; font:11px Manrope,Arial,sans-serif; opacity:.7; }
 .editor-tabs { overflow-x:auto; scrollbar-width:none; }
 .editor-tabs::-webkit-scrollbar { display:none; }
-.editor-tabs-actions { position:sticky; right:0; flex:0 0 50px; display:grid; place-items:center; margin-left:auto; background:#1b1b1b; }
+.editor-tabs-actions { position:sticky; right:0; z-index:2; flex:0 0 50px; display:grid; place-items:center; margin-left:auto; background:#1b1b1b; }
 .editor-tabs-menu-button { width:38px; height:31px; border:0; border-radius:0; color:#c8c8c8; background:transparent; font:17px/1 Manrope,Arial,sans-serif; letter-spacing:2px; cursor:pointer; }
 .editor-tabs-menu-button:hover { color:#fff; background:transparent; }
 .editor-tabs-menu { position:fixed; z-index:20; top:auto; right:auto; display:flex; flex-direction:column; min-width:170px; padding:5px; border:1px solid #555; border-radius:5px; background:#242424; box-shadow:0 10px 22px rgba(0,0,0,.45); }
