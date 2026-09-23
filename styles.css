@@ -520,7 +520,8 @@ body.vuppo-hide-minimap .editor-content { padding-right:0; }
 .vuppo-settings-overlay { position:fixed; z-index:60; inset:0; display:flex; flex-direction:column; color:#cccccc; background:#1e1e1e; font:12px Manrope,Arial,sans-serif; }
 .vuppo-settings-overlay.hidden { display:none; }
 .vuppo-settings-topbar { display:flex; align-items:center; gap:14px; padding:9px 18px; border-bottom:1px solid #2b2b2b; background:#181818; }
-.vuppo-settings-logo { width:22px; height:22px; display:grid; place-items:center; color:#161816; background:#c8f169; font-size:11px; font-weight:800; clip-path:polygon(50% 0,92% 23%,92% 77%,50% 100%,8% 77%,8% 23%); }
+.vuppo-settings-logo { width:35px; height:35px; display:grid; place-items:center; }
+.vuppo-settings-logo img { width:100%; height:100%; object-fit:contain; display:block; }
 .vuppo-settings-topbar strong { color:#e8e8e8; font-size:13px; }
 .vuppo-settings-search { flex:1; max-width:480px; display:flex; align-items:center; gap:8px; border:1px solid #3c3c3c; border-radius:3px; padding:5px 9px; background:#2a2a2a; }
 .vuppo-settings-search:focus-within { border-color:#c8f169; }
@@ -565,10 +566,13 @@ body.vuppo-hide-minimap .editor-content { padding-right:0; }
 .settings-reset:hover { color:#e5e5e5; background:#333; }
 .settings-empty { padding:40px 0; color:#8a8a8a; font-size:12px; }
 .settings-about { display:flex; align-items:center; gap:12px; margin:8px 0 10px; }
-.settings-about-mark { width:34px; height:34px; display:grid; place-items:center; color:#161816; background:#c8f169; font-size:15px; font-weight:800; clip-path:polygon(50% 0,92% 23%,92% 77%,50% 100%,8% 77%,8% 23%); }
+.settings-about-mark { width:35px; height:35px; display:grid; place-items:center; }
+.settings-about-mark img { width:100%; height:100%; object-fit:contain; display:block; }
 .settings-about strong { display:block; color:#f0f0f0; font-size:14px; }
 .settings-about span { color:#8a8a8a; font-size:11px; }
 .settings-about-copy { max-width:560px; margin:0; color:#a9a9a9; font-size:11.5px; line-height:1.6; }
+.settings-about-copy p { margin:0 0 10px; }
+.settings-about-copy p:last-child { margin-bottom:0; }
 .settings-account { margin:8px 0 4px; padding:14px 16px; border:1px solid #2b2b2b; border-radius:5px; background:#1c1c1c; }
 .settings-account-head { display:flex; align-items:center; gap:12px; }
 .settings-account-avatar { width:36px; height:36px; flex:0 0 36px; display:grid; place-items:center; border-radius:50%; color:#161816; background:#c8f169; font-size:15px; font-weight:800; }
