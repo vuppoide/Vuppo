@@ -333,6 +333,7 @@ function resolveProjectPreviewUrl() {
 }
 
 let editorTabsMenuGuardsInstalled = false;
+let previewDeviceGuardsInstalled = false;
 
 function updateEditorTabsMenuVisibility() {
   const editorTabs = document.querySelector('.editor-tabs');
@@ -425,12 +426,45 @@ function setupWorkspaceControls(workspace) {
     settings: '<div class="workspace-side-view" data-side-view="settings"><div class="sidebar-title">CONFIGURAÇÕES</div><div class="workspace-view-empty"><strong>Configurações</strong><span>Preferências do editor.</span></div></div>'
   };
   sidebar.insertAdjacentHTML('beforeend', sideViews.git + sideViews.extensions + sideViews.settings);
-  editor.insertAdjacentHTML('beforeend', '<section class="workspace-feature-panel preview-panel hidden" data-feature-panel="preview"><div class="preview-browser-bar"><button type="button" class="preview-target">▣ <span>Desktop</span>⌄</button><div class="preview-url"><span>◉</span>http://localhost:3000</div><button type="button" aria-label="Atualizar preview">↻</button><button type="button" aria-label="Abrir preview em nova janela">↗</button><button type="button" class="feature-close" aria-label="Fechar Preview">×</button></div><div class="preview-empty"><div class="preview-browser-icon"><i></i><i></i><i></i><span></span></div><strong>No preview available</strong><span>Run your project to see the preview here.</span></div></section><section class="workspace-feature-panel terminal-panel hidden" data-feature-panel="terminal"><div class="terminal-heading"><div class="terminal-tabs"><button class="terminal-tab active" type="button">powershell</button></div><div class="terminal-controls"><button type="button" class="terminal-control terminal-new" title="Novo terminal" aria-label="Novo terminal">+</button><button type="button" class="terminal-control terminal-maximize" title="Maximizar terminal" aria-label="Maximizar terminal">□</button><button type="button" class="terminal-control terminal-trash" title="Fechar terminal" aria-label="Fechar terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg></button></div></div><div class="terminal-output"><span class="terminal-prompt">PS Vuppo&gt;</span><span class="terminal-cursor"></span></div></section><section class="workspace-feature-panel chat-panel hidden" data-feature-panel="chat"><header class="chat-heading"><div class="chat-title"><span class="chat-agent-icon">V</span><strong>Vuppo Chat</strong><span class="chat-status-dot"></span></div><div class="chat-heading-actions"><button type="button" class="chat-heading-button" title="Novo chat" aria-label="Novo chat">+</button><button type="button" class="feature-close" aria-label="Fechar Chat">Fechar</button></div></header><div class="chat-thread"><div class="chat-welcome"><span class="chat-welcome-icon">V</span><strong>Como posso ajudar?</strong><p>Analise o código, explique um achado ou sugira uma correção.</p></div></div><div class="chat-composer"><div class="chat-input"><span>Mensagem para Vuppo...</span><b>↑</b></div><div class="chat-composer-footer"><button type="button" class="chat-model">Vuppo Security <span>⌄</span></button><span class="chat-shortcut">Enter para enviar</span></div></div></section>');
+  editor.insertAdjacentHTML('beforeend', '<section class="workspace-feature-panel preview-panel hidden" data-feature-panel="preview"><div class="preview-browser-bar"><button type="button" class="preview-target">▣ <span>Desktop</span>⌄</button><div class="preview-url"><span>◉</span>http://localhost:3000</div><button type="button" aria-label="Atualizar preview"><span class="preview-refresh-icon">↻</span></button><button type="button" aria-label="Abrir preview em nova janela"><i class="codicon codicon-globe"></i></button><button type="button" class="feature-close" aria-label="Fechar Preview">×</button></div><div class="preview-empty"><div class="preview-browser-icon"><i></i><i></i><i></i><span></span></div><strong>No preview available</strong><span>Run your project to see the preview here.</span></div></section><section class="workspace-feature-panel terminal-panel hidden" data-feature-panel="terminal"><div class="terminal-heading"><div class="terminal-tabs"><button class="terminal-tab active" type="button">powershell</button></div><div class="terminal-controls"><button type="button" class="terminal-control terminal-new" title="Novo terminal" aria-label="Novo terminal">+</button><button type="button" class="terminal-control terminal-maximize" title="Maximizar terminal" aria-label="Maximizar terminal">□</button><button type="button" class="terminal-control terminal-trash" title="Fechar terminal" aria-label="Fechar terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg></button></div></div><div class="terminal-output"><span class="terminal-prompt">PS Vuppo&gt;</span><span class="terminal-cursor"></span></div></section><section class="workspace-feature-panel chat-panel hidden" data-feature-panel="chat"><header class="chat-heading"><div class="chat-title"><span class="chat-agent-icon">V</span><strong>Vuppo Chat</strong><span class="chat-status-dot"></span></div><div class="chat-heading-actions"><button type="button" class="chat-heading-button" title="Novo chat" aria-label="Novo chat">+</button><button type="button" class="feature-close" aria-label="Fechar Chat">Fechar</button></div></header><div class="chat-thread"><div class="chat-welcome"><span class="chat-welcome-icon">V</span><strong>Como posso ajudar?</strong><p>Analise o código, explique um achado ou sugira uma correção.</p></div></div><div class="chat-composer"><div class="chat-input"><span>Mensagem para Vuppo...</span><b>↑</b></div><div class="chat-composer-footer"><button type="button" class="chat-model">Vuppo Security <span>⌄</span></button><span class="chat-shortcut">Enter para enviar</span></div></div></section>');
   const previewPanel = editor.querySelector('[data-feature-panel="preview"]');
   const previewUrl = resolveProjectPreviewUrl();
   const previewPlaceholder = previewPanel.querySelector('.preview-empty');
-  previewPanel.querySelector('.preview-target').innerHTML = '<span class="desktop-icon">▣</span><span>Desktop</span><b>⌄</b>';
+  const previewTarget = previewPanel.querySelector('.preview-target');
+  const renderPreviewTargetLabel = (device) => {
+    const isMobile = device === 'mobile';
+    previewTarget.innerHTML = `<span class="desktop-icon">${isMobile ? '▯' : '▣'}</span><span>${isMobile ? 'Mobile' : 'Desktop'}</span><b>⌄</b>`;
+  };
+  renderPreviewTargetLabel('desktop');
   previewPanel.querySelector('.preview-url').innerHTML = `<span class="globe-icon"></span><span class="preview-url-text">${previewUrl}</span>`;
+  previewTarget.insertAdjacentHTML('afterend', '<div class="preview-device-menu hidden"><button type="button" data-preview-device="desktop" class="active">Desktop</button><button type="button" data-preview-device="mobile">Mobile</button></div>');
+  const previewDeviceMenu = previewPanel.querySelector('.preview-device-menu');
+  const applyPreviewDevice = (device) => {
+    previewPanel.classList.toggle('is-mobile', device === 'mobile');
+    renderPreviewTargetLabel(device);
+    previewDeviceMenu.querySelectorAll('[data-preview-device]').forEach((button) => button.classList.toggle('active', button.dataset.previewDevice === device));
+    previewDeviceMenu.classList.add('hidden');
+  };
+  previewTarget.addEventListener('click', (event) => {
+    event.stopPropagation();
+    previewDeviceMenu.classList.toggle('hidden');
+  });
+  previewDeviceMenu.querySelectorAll('[data-preview-device]').forEach((button) => {
+    button.addEventListener('click', () => applyPreviewDevice(button.dataset.previewDevice));
+  });
+  if (!previewDeviceGuardsInstalled) {
+    previewDeviceGuardsInstalled = true;
+    document.addEventListener('click', (event) => {
+      const menu = document.querySelector('.preview-device-menu');
+      if (!menu || menu.classList.contains('hidden')) return;
+      if (menu.contains(event.target) || event.target.closest?.('.preview-target')) return;
+      menu.classList.add('hidden');
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      document.querySelector('.preview-device-menu')?.classList.add('hidden');
+    });
+  }
   let previewWebview = previewPanel.querySelector('webview');
   if (!previewWebview) {
     previewWebview = document.createElement('webview');
@@ -440,18 +474,37 @@ function setupWorkspaceControls(workspace) {
     previewPanel.appendChild(previewWebview);
   }
   previewWebview.setAttribute('src', previewUrl);
+  const refreshButton = previewPanel.querySelector('[aria-label="Atualizar preview"]');
+  let refreshSpinnerTimer = 0;
+  const stopRefreshSpinner = () => {
+    clearTimeout(refreshSpinnerTimer);
+    refreshButton?.classList.remove('is-refreshing');
+  };
   previewWebview.addEventListener('did-finish-load', () => {
+    stopRefreshSpinner();
     previewPlaceholder?.classList.add('hidden');
   });
-  previewWebview.addEventListener('did-fail-load', () => {
+  previewWebview.addEventListener('did-fail-load', (event) => {
+    if (event?.errorCode === -3 || event?.isMainFrame === false) return;
+    stopRefreshSpinner();
     previewPlaceholder?.classList.remove('hidden');
     const title = previewPlaceholder?.querySelector('strong');
     const text = previewPlaceholder?.querySelector('span');
     if (title) title.textContent = 'Preview indisponível';
     if (text) text.textContent = 'Inicie o projeto em http://localhost:3000 para visualizar a página.';
   });
-  previewPanel.querySelector('[aria-label="Atualizar preview"]')?.addEventListener('click', () => {
-    previewWebview.reload();
+  refreshButton?.addEventListener('click', () => {
+    refreshButton.classList.remove('is-refreshing');
+    void refreshButton.offsetWidth;
+    refreshButton.classList.add('is-refreshing');
+    clearTimeout(refreshSpinnerTimer);
+    refreshSpinnerTimer = setTimeout(stopRefreshSpinner, 6000);
+    previewPlaceholder?.classList.add('hidden');
+    try {
+      previewWebview.reload();
+    } catch {
+      previewWebview.setAttribute('src', `${previewUrl}${previewUrl.includes('?') ? '&' : '?'}_vuppo=${Date.now()}`);
+    }
   });
   previewPanel.querySelector('[aria-label="Abrir preview em nova janela"]')?.addEventListener('click', () => {
     window.open(previewUrl, '_blank', 'noopener,noreferrer');
@@ -1114,6 +1167,7 @@ function setupWorkspaceControls(workspace) {
       }
       if (panel) {
         panel.classList.toggle('hidden', isOpen);
+        if (panel.classList.contains('hidden')) panel.querySelector('.preview-device-menu')?.classList.add('hidden');
         button.classList.toggle('active', !isOpen);
         if (feature === 'terminal' && isOpen === false) {
           if (!terminalTabs.children.length) addTerminalTab();
@@ -1138,6 +1192,7 @@ function setupWorkspaceControls(workspace) {
   workspace.querySelectorAll('.feature-close').forEach((button) => button.addEventListener('click', () => {
     const panel = button.closest('.workspace-feature-panel');
     panel.classList.add('hidden');
+    panel.querySelector('.preview-device-menu')?.classList.add('hidden');
     const topButton = workspace.querySelector(`.top-action-button[title="${panel.dataset.featurePanel[0].toUpperCase()}${panel.dataset.featurePanel.slice(1)}"]`);
     if (topButton) topButton.classList.remove('active');
     workspace.querySelector('.editor-tabs').classList.remove('preview-active');
