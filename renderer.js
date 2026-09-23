@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   editorFontSize: 12,
   editorWordWrap: true,
   editorLineNumbers: true,
+  editorMinimap: true,
   editorTabSize: 2,
   autoSave: 'off',
   autoSaveDelay: 1000,
@@ -21,10 +22,12 @@ const DEFAULT_SETTINGS = {
   gitConfirmDiscard: true,
 };
 const SETTINGS_SCHEMA = [
+  { id: 'account', label: 'Conta', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>', options: [] },
   { id: 'editor', label: 'Editor', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>', options: [
     { key: 'editorFontSize', type: 'number', label: 'Tamanho da fonte do código', description: 'Tamanho da fonte usada no editor de código e na prévia.', min: 8, max: 32, step: 1 },
     { key: 'editorWordWrap', type: 'checkbox', label: 'Quebra de linha automática', description: 'Define se as linhas longas são quebradas para caber na largura do editor.' },
     { key: 'editorLineNumbers', type: 'checkbox', label: 'Números de linha', description: 'Exibe os números de linha ao lado do código.' },
+    { key: 'editorMinimap', type: 'checkbox', label: 'Mini mapa', description: 'Exibe o mini mapa de navegação ao lado do código do editor.' },
     { key: 'editorTabSize', type: 'number', label: 'Tamanho da tabulação', description: 'Quantidade de espaços equivalente a uma tabulação.', min: 2, max: 8, step: 1 },
     { key: 'autoSave', type: 'select', label: 'Salvamento automático', description: 'Salva as alterações do editor automaticamente após um atraso.', choices: [['off', 'off'], ['afterDelay', 'afterDelay']] },
     { key: 'autoSaveDelay', type: 'number', label: 'Atraso do salvamento automático', description: 'Tempo em milissegundos após digitar antes de salvar (requer autoSave: afterDelay).', min: 200, max: 10000, step: 100, isDisabled: (current) => current.autoSave !== 'afterDelay' },
@@ -1561,6 +1564,7 @@ function applySettings() {
   root.style.setProperty('--vuppo-code-tab-size', `${settings.editorTabSize}`);
   document.body.classList.toggle('vuppo-nowrap-code', settings.editorWordWrap === false);
   document.body.classList.toggle('vuppo-hide-line-numbers', settings.editorLineNumbers === false);
+  document.body.classList.toggle('vuppo-hide-minimap', settings.editorMinimap === false);
   applySeverityFilter();
 }
 
@@ -1614,8 +1618,21 @@ function ensureSettingsOverlay() {
   });
   content.addEventListener('click', (event) => {
     const resetButton = event.target.closest('[data-reset-setting]');
-    if (!resetButton) return;
-    setSetting(resetButton.dataset.resetSetting, DEFAULT_SETTINGS[resetButton.dataset.resetSetting]);
+    if (resetButton) {
+      setSetting(resetButton.dataset.resetSetting, DEFAULT_SETTINGS[resetButton.dataset.resetSetting]);
+      return;
+    }
+    const accountAction = event.target.closest('[data-account-action]');
+    if (!accountAction) return;
+    if (accountAction.dataset.accountAction === 'upgrade') {
+      closeVuppoSettings();
+      $('#plans-modal')?.classList.remove('hidden');
+    } else if (accountAction.dataset.accountAction === 'logout') {
+      accountAction.disabled = true;
+      window.vuppo.logout()
+        .then(() => window.location.reload())
+        .catch(() => { accountAction.disabled = false; });
+    }
   });
   searchInput.addEventListener('input', () => renderSettingsContent());
 }
@@ -1649,12 +1666,40 @@ function renderSettingsContent() {
   const activeCategory = SETTINGS_SCHEMA.find((category) => category.id === settingsActiveCategory) || SETTINGS_SCHEMA[0];
   content.innerHTML = activeCategory.id === 'about'
     ? `<section class="settings-section"><p class="settings-breadcrumb">Configurações › Sobre</p><h3 class="settings-section-title">Sobre</h3><div class="settings-about"><div class="settings-about-mark">V</div><div><strong>Vuppo</strong><span>Versão ${VUPPO_VERSION}</span></div></div><p class="settings-about-copy">Editor de código estilo VS Code com auditoria de segurança integrada: explore e edite seus arquivos, use terminal e Git integrados, converse no Chat e acompanhe os riscos no painel Security Problems.</p></section>`
-    : renderSettingsSection(activeCategory, false);
+    : activeCategory.id === 'account'
+      ? renderAccountSection()
+      : renderSettingsSection(activeCategory, false);
+  if (activeCategory.id === 'account') fillSettingsAccount();
 }
 
 function renderSettingsSection(category, fromSearch) {
   const rows = category.options.map((option) => renderSettingsRow(option)).join('');
   return `<section class="settings-section" data-settings-section="${category.id}"><p class="settings-breadcrumb">Configurações › ${category.label}${fromSearch ? ' › Resultados' : ''}</p><h3 class="settings-section-title">${category.label}</h3>${rows}</section>`;
+}
+
+function renderAccountSection() {
+  return `<section class="settings-section" data-settings-section="account"><p class="settings-breadcrumb">Configurações › Conta</p><h3 class="settings-section-title">Conta</h3><div class="settings-account" id="settings-account-card"><div class="settings-account-head"><div class="settings-account-avatar" id="settings-account-avatar">V</div><div class="settings-account-info"><strong id="settings-account-name">Conta local Vuppo</strong><span id="settings-account-email">Carregando…</span></div><span class="settings-account-plan">Free Plan</span></div></div><div class="settings-row"><div class="settings-row-text"><strong>Plano atual</strong><span>Você está no Free Plan. Faça upgrade para Pro ou Team quando quiser.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-primary" data-account-action="upgrade">Fazer upgrade</button></div></div><div class="settings-row"><div class="settings-row-text"><strong>Provedor de acesso</strong><span id="settings-account-provider">…</span></div></div><div class="settings-row"><div class="settings-row-text"><strong>Sair da conta</strong><span>Encerra a sessão atual e volta para a tela de login.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-danger" data-account-action="logout">Sair</button></div></div></section>`;
+}
+
+function fillSettingsAccount() {
+  if (!$('#settings-account-card')) return;
+  Promise.resolve(window.vuppo.getSession?.()).then((account) => {
+    if (!$('#settings-account-card')) return;
+    const name = $('#settings-account-name');
+    const email = $('#settings-account-email');
+    const provider = $('#settings-account-provider');
+    const avatar = $('#settings-account-avatar');
+    if (!account) {
+      if (name) name.textContent = 'Conta local Vuppo';
+      if (email) email.textContent = 'Nenhuma sessão ativa.';
+      if (provider) provider.textContent = 'Sessão local';
+      return;
+    }
+    if (name) name.textContent = account.name || 'Conta Vuppo';
+    if (email) email.textContent = account.email || '';
+    if (avatar) avatar.textContent = (String(account.name || account.email || '?').trim().charAt(0) || 'V').toUpperCase();
+    if (provider) provider.textContent = ({ email: 'E-mail e senha', google: 'Google', github: 'GitHub', apple: 'Apple' })[account.provider] || 'E-mail e senha';
+  }).catch(() => {});
 }
 
 function openVuppoSettings(category) {
