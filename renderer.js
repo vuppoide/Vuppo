@@ -19,8 +19,17 @@ const DEFAULT_SETTINGS = {
   autoSave: 'off',
   autoSaveDelay: 1000,
   chatSendOnEnter: true,
+  chatAutoScroll: true,
+  chatIncludeActiveFile: false,
+  chatConfirmClearHistory: true,
+  chatHistoryLimit: 20,
+  chatFontSize: 11,
   securityMinSeverity: 'all',
   gitConfirmDiscard: true,
+  gitConfirmCommit: false,
+  gitSmartCommit: false,
+  gitShowUntracked: true,
+  gitAutoRefresh: true,
 };
 const SETTINGS_SCHEMA = [
   { id: 'account', label: 'Conta', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>', options: [] },
@@ -36,12 +45,21 @@ const SETTINGS_SCHEMA = [
   ] },
   { id: 'chat', label: 'Chat', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/></svg>', options: [
     { key: 'chatSendOnEnter', type: 'checkbox', label: 'Enviar mensagem com Enter', description: 'Quando desativado, use Ctrl+Enter para enviar e o Enter insere uma nova linha.' },
+    { key: 'chatAutoScroll', type: 'checkbox', label: 'Rolagem automática', description: 'Mantém o chat sempre posicionado na mensagem mais recente.' },
+    { key: 'chatIncludeActiveFile', type: 'checkbox', label: 'Anexar o arquivo aberto ao contexto', description: 'Adiciona automaticamente o arquivo ativo do editor aos chips de contexto ao enviar uma mensagem.' },
+    { key: 'chatConfirmClearHistory', type: 'checkbox', label: 'Confirmar antes de excluir conversas', description: 'Pede confirmação ao excluir uma conversa do histórico ou todo o histórico do chat.' },
+    { key: 'chatHistoryLimit', type: 'number', label: 'Limite de conversas no histórico', description: 'Quantidade máxima de conversas arquivadas mantidas no histórico do chat.', min: 5, max: 100, step: 5 },
+    { key: 'chatFontSize', type: 'number', label: 'Tamanho da fonte do chat', description: 'Tamanho da fonte usado nas mensagens e no campo de texto do chat.', min: 10, max: 18, step: 1 },
   ] },
   { id: 'security', label: 'Segurança', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 5.5v5c0 4.6 3 8.4 7 10 4-1.6 7-5.4 7-10v-5Z"/><path d="m9.3 12 2 2 3.4-3.8"/></svg>', options: [
     { key: 'securityMinSeverity', type: 'select', label: 'Severidade mínima exibida', description: 'Mostra no painel Security Problems apenas riscos com essa severidade ou superior.', choices: [['all', 'Todas'], ['medium', 'Médio e superior'], ['high', 'Alto e superior'], ['critical', 'Somente crítico']] },
   ] },
   { id: 'git', label: 'Git', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg>', options: [
     { key: 'gitConfirmDiscard', type: 'checkbox', label: 'Confirmar antes de descartar alterações', description: 'Pede confirmação ao descartar as alterações de um arquivo no controle de versão.' },
+    { key: 'gitConfirmCommit', type: 'checkbox', label: 'Confirmar antes de criar o commit', description: 'Pede confirmação mostrando quantos arquivos serão enviados antes de criar o commit.' },
+    { key: 'gitSmartCommit', type: 'checkbox', label: 'Preparar tudo automaticamente ao commitar', description: 'Quando nada estiver no Stage, adiciona todas as alterações automaticamente antes de criar o commit (smart commit).' },
+    { key: 'gitShowUntracked', type: 'checkbox', label: 'Exibir arquivos não rastreados', description: 'Mostra os arquivos novos (não rastreados) na lista de alterações do controle de versão.' },
+    { key: 'gitAutoRefresh', type: 'checkbox', label: 'Atualizar ao voltar para a janela', description: 'Atualiza o status do controle de versão quando a janela da VUPPO volta a receber foco.' },
   ] },
   { id: 'about', label: 'Sobre', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>', options: [] },
 ];
@@ -549,13 +567,15 @@ function setupWorkspaceControls(workspace) {
   const archiveActiveChatSession = () => {
     if (!activeChatSession?.messages.length || chatSessions.includes(activeChatSession)) return;
     chatSessions.unshift(activeChatSession);
+    const limit = Number(getSettings().chatHistoryLimit);
+    if (Number.isFinite(limit) && limit > 0 && chatSessions.length > limit) chatSessions.length = limit;
   };
   const appendChatMessageElement = (text, className) => {
     const messageElement = document.createElement('div');
     messageElement.className = `chat-message ${className}`;
     messageElement.textContent = text;
     chatThread.appendChild(messageElement);
-    chatThread.scrollTop = chatThread.scrollHeight;
+    if (getSettings().chatAutoScroll !== false) chatThread.scrollTop = chatThread.scrollHeight;
     return messageElement;
   };
   const appendChatMessage = (message, className) => {
@@ -570,6 +590,7 @@ function setupWorkspaceControls(workspace) {
     session.messages.forEach((item) => appendChatMessageElement(item.text, item.className));
   };
   const deleteChatSession = (session) => {
+    if (getSettings().chatConfirmClearHistory !== false && !confirm('Excluir esta conversa do histórico?')) return;
     const index = chatSessions.indexOf(session);
     if (index >= 0) chatSessions.splice(index, 1);
     if (activeChatSession === session) {
@@ -629,9 +650,19 @@ function setupWorkspaceControls(workspace) {
       chatHistoryList.appendChild(item);
     });
   };
+  const attachActiveEditorFileToContext = () => {
+    if (getSettings().chatIncludeActiveFile !== true || !currentReport) return;
+    const activeFile = document.querySelector('.workspace .editor-tab.active')?.dataset.file;
+    if (!activeFile) return;
+    const normalized = normalizeTreePath(activeFile);
+    if (!normalized || chatContextEntries.some((entry) => entry.path === normalized)) return;
+    chatContextEntries.push({ path: normalized, isFolder: false, projectPath: currentReport.projectPath });
+    renderChatContextChips();
+  };
   const sendChatMessage = () => {
     const message = chatMessageInput.value.trim();
     if (!message) return;
+    attachActiveEditorFileToContext();
     appendChatMessage(message, 'chat-message-user');
     chatMessageInput.value = '';
     chatMessageInput.style.height = '';
@@ -679,6 +710,7 @@ function setupWorkspaceControls(workspace) {
   chatHistoryToggle.addEventListener('click', toggleChatHistory);
   chatHistory.querySelector('.chat-history-clear').addEventListener('click', (event) => {
     event.stopPropagation();
+    if (getSettings().chatConfirmClearHistory !== false && !confirm('Excluir todo o histórico de conversas do chat?')) return;
     chatSessions.length = 0;
     activeChatSession = null;
     renderChatThread(null);
@@ -1235,9 +1267,11 @@ function setupWorkspaceControls(workspace) {
 }
 
 function getGitChanges() {
+  const changes = currentReport.gitChanges || [];
+  const showUntracked = getSettings().gitShowUntracked !== false;
   return {
-    staged: (currentReport.gitChanges || []).filter((change) => !change.untracked && change.x !== ' ' && change.x !== '?'),
-    unstaged: (currentReport.gitChanges || []).filter((change) => change.untracked || change.y !== ' ' || change.y === '?'),
+    staged: changes.filter((change) => !change.untracked && change.x !== ' ' && change.x !== '?'),
+    unstaged: changes.filter((change) => (showUntracked || !change.untracked) && (change.untracked || change.y !== ' ' || change.y === '?')),
   };
 }
 
@@ -1301,10 +1335,23 @@ function renderSourceControlChanges(scBody) {
   const messageInput = scBody.querySelector('.sc-message');
   const commitButton = scBody.querySelector('.sc-commit');
   const runCommit = async () => {
-    if (!messageInput.value.trim()) { messageInput.focus(); return; }
+    const message = messageInput.value.trim();
+    if (!message) { messageInput.focus(); return; }
+    const { staged } = getGitChanges();
+    const allChanges = currentReport.gitChanges || [];
+    const smartCommit = getSettings().gitSmartCommit === true && staged.length === 0 && allChanges.length > 0;
+    const confirmation = smartCommit
+      ? `Nada está no Stage. Adicionar ${allChanges.length} arquivo(s) automaticamente e criar o commit?`
+      : `Criar o commit com ${staged.length} arquivo(s) preparado(s)?`;
+    if (getSettings().gitConfirmCommit === true && !confirm(confirmation)) return;
     commitButton.disabled = true;
     try {
-      await window.vuppo.gitCommit({ projectPath: currentReport.projectPath, message: messageInput.value });
+      if (smartCommit) {
+        for (const change of allChanges) {
+          await window.vuppo.gitStage({ projectPath: currentReport.projectPath, path: change.path, untracked: change.untracked });
+        }
+      }
+      await window.vuppo.gitCommit({ projectPath: currentReport.projectPath, message });
       messageInput.value = '';
       await refreshSourceControl();
     } catch (error) {
@@ -1353,6 +1400,8 @@ async function refreshSourceControl() {
   renderSourceControlView();
 }
 
+let sourceControlFocusBound = false;
+
 function setupSourceControlView(workspace) {
   const refreshButton = workspace.querySelector('.sc-refresh');
   if (!refreshButton) return;
@@ -1362,6 +1411,14 @@ function setupSourceControlView(workspace) {
   workspace.querySelectorAll('[data-workspace-view="git"], .activity-button[title="Git"]').forEach((button) => {
     button.addEventListener('click', () => refreshSourceControl());
   });
+  if (!sourceControlFocusBound) {
+    sourceControlFocusBound = true;
+    window.addEventListener('focus', () => {
+      if (getSettings().gitAutoRefresh === false) return;
+      if (!document.querySelector('.workspace:not(.hidden)')) return;
+      refreshSourceControl();
+    });
+  }
 }
 
 function selectWorkspaceFinding(index) {
@@ -1661,19 +1718,21 @@ function setSetting(key, value) {
   if (!(key in DEFAULT_SETTINGS)) return;
   settings = { ...settings, [key]: normalizeSettingValue(findSettingOption(key), value) };
   saveSettings();
-  applySettings();
+  applySettings(key);
   renderSettingsContent();
 }
 
-function applySettings() {
+function applySettings(changedKey) {
   const root = document.documentElement;
   root.style.setProperty('--vuppo-code-font-size', `${settings.editorFontSize}px`);
   root.style.setProperty('--vuppo-code-tab-size', `${settings.editorTabSize}`);
   root.style.setProperty('--vuppo-minimap-width', `${getMinimapWidth()}px`);
+  root.style.setProperty('--vuppo-chat-font-size', `${settings.chatFontSize}px`);
   document.body.classList.toggle('vuppo-nowrap-code', settings.editorWordWrap === false);
   document.body.classList.toggle('vuppo-hide-line-numbers', settings.editorLineNumbers === false);
   document.body.classList.toggle('vuppo-hide-minimap', settings.editorMinimap === false);
   activeMinimapRefresh?.();
+  if (currentReport?.gitStatus && (!changedKey || changedKey.startsWith('git'))) renderSourceControlView();
   applySeverityFilter();
 }
 

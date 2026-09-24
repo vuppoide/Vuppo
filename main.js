@@ -67,6 +67,7 @@ app.whenReady().then(() => {
         resolve(result.filePaths[0]);
       });
     });
+  });
   function runGit(args, cwd) {
     return new Promise((resolve, reject) => {
       execFile('git', args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
@@ -134,9 +135,6 @@ app.whenReady().then(() => {
     if (!projectPath || !fs.existsSync(projectPath)) throw new Error('Projeto não encontrado.');
     await runGit(['init'], projectPath);
     return true;
-  });
-
-  ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
   });
 
   ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
