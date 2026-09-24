@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   editorWordWrap: true,
   editorLineNumbers: true,
   editorMinimap: true,
+  editorMinimapWidth: 120,
   editorTabSize: 2,
   autoSave: 'off',
   autoSaveDelay: 1000,
@@ -28,6 +29,7 @@ const SETTINGS_SCHEMA = [
     { key: 'editorWordWrap', type: 'checkbox', label: 'Quebra de linha automática', description: 'Define se as linhas longas são quebradas para caber na largura do editor.' },
     { key: 'editorLineNumbers', type: 'checkbox', label: 'Números de linha', description: 'Exibe os números de linha ao lado do código.' },
     { key: 'editorMinimap', type: 'checkbox', label: 'Mini mapa', description: 'Exibe o mini mapa de navegação ao lado do código do editor.' },
+    { key: 'editorMinimapWidth', type: 'number', label: 'Largura do mini mapa', description: 'Largura em pixels do mini mapa de navegação do editor (120px é o padrão).', min: 60, max: 320, step: 10, isDisabled: (current) => current.editorMinimap === false },
     { key: 'editorTabSize', type: 'number', label: 'Tamanho da tabulação', description: 'Quantidade de espaços equivalente a uma tabulação.', min: 2, max: 8, step: 1 },
     { key: 'autoSave', type: 'select', label: 'Salvamento automático', description: 'Salva as alterações do editor automaticamente após um atraso.', choices: [['off', 'off'], ['afterDelay', 'afterDelay']] },
     { key: 'autoSaveDelay', type: 'number', label: 'Atraso do salvamento automático', description: 'Tempo em milissegundos após digitar antes de salvar (requer autoSave: afterDelay).', min: 200, max: 10000, step: 100, isDisabled: (current) => current.autoSave !== 'afterDelay' },
@@ -44,6 +46,7 @@ const SETTINGS_SCHEMA = [
   { id: 'about', label: 'Sobre', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>', options: [] },
 ];
 let settings = loadSettings();
+let activeMinimapRefresh = null;
 
 window.vuppo.getMaterialIconCatalog().then((catalog) => { materialIconCatalog = catalog; }).catch(() => {});
 
@@ -224,6 +227,7 @@ function renderReport() {
   </div></div>`;
   workspace.querySelector('.workspace-body').insertAdjacentHTML('beforeend', `<aside class="workspace-sidebar"><div class="sidebar-title">EXPLORER <span>${currentReport.filesScanned}</span></div><section class="explorer-open-editors"><div class="explorer-section-heading">OPEN EDITORS</div><button class="open-editor-item" type="button"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</button></section><div class="file-tree"><div class="tree-folder">${escapeHtml(currentReport.projectName)}</div>${(files.length ? files : [{ file: 'Nenhum arquivo encontrado' }]).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}"><span class="file-dot"></span>${escapeHtml(file.file)}</button>`).join('')}</div><div class="sidebar-bottom"><span>ANALISE</span><strong>${currentReport.findings.length} achados</strong><small>${currentReport.durationMs} ms · ${currentReport.filesScanned} arquivos</small></div></aside><main class="workspace-editor"><div class="editor-tabs"><span class="editor-tab active"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</span></div><div class="editor-content"><div class="line-numbers">${Array.from({ length: Math.max(12, firstFinding ? firstFinding.line + 4 : 12) }, (_, index) => `<span>${index + 1}</span>`).join('')}</div><pre class="code-preview"><code>${escapeHtml(firstFinding ? firstFinding.excerpt : (files[0]?.content || '// Nenhum arquivo encontrado.'))}</code></pre></div><div class="editor-panel-label">PROBLEMS <span>${currentReport.findings.length}</span></div></main><aside class="security-panel"><div class="security-heading"><div><span class="panel-eyebrow">VUPPO SECURITY</span><h2>Security Problems</h2></div><span class="finding-total">${currentReport.findings.length}</span></div><div class="severity-summary"><span><b class="severity-critical">${counts.critical || 0}</b> critical</span><span><b class="severity-high">${counts.high || 0}</b> high</span><span><b class="severity-medium">${counts.medium || 0}</b> medium</span></div><div class="workspace-findings">${currentReport.findings.length ? currentReport.findings.map((finding, index) => `<button class="workspace-finding ${index === 0 ? 'selected' : ''}" data-finding-index="${index}"><span class="finding-severity ${finding.severity}"></span><span><strong>${escapeHtml(finding.title)}</strong><small>${escapeHtml(finding.file)}:${finding.line}</small></span></button>`).join('') : '<div class="workspace-empty-state">Nenhum risco encontrado pelas regras atuais.</div>'}</div></aside><footer class="workspace-statusbar"><span>main</span><span>${escapeHtml(currentReport.projectPath)}</span><span>${currentReport.scannedAt.slice(0, 10)} · ${currentReport.filesScanned} arquivos</span></footer>`);
   workspace.querySelector('.editor-tabs').innerHTML = '';
+  activeMinimapRefresh = null;
   workspace.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
   const fileTree = workspace.querySelector('.file-tree');
   if (files.length || (currentReport.directories || []).length) {
@@ -1441,7 +1445,10 @@ function closeEditorTab(file) {
   if (!wasActive) return;
   const nextTab = tabs.querySelector('.editor-tab:last-child');
   if (nextTab) selectWorkspaceFile(nextTab.dataset.file);
-  else document.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
+  else {
+    activeMinimapRefresh = null;
+    document.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
+  }
 }
 
 function closeActiveEditor() {
@@ -1452,6 +1459,7 @@ function closeActiveEditor() {
 function renderWorkspaceFile(fileData, findingLine, fallbackText) {
   const editorContent = document.querySelector('.editor-content');
   if (!editorContent || !fileData) return;
+  activeMinimapRefresh = null;
   if (fileData.isImage) {
     editorContent.innerHTML = fileData.content
       ? `<div class="image-preview"><header class="image-preview-heading"><span class="image-preview-name">${escapeHtml(fileData.file.split(/[\\/]/).pop())}</span><button class="image-preview-close" type="button" title="Fechar imagem" aria-label="Fechar imagem">×</button></header><img src="${fileData.content}" alt="${escapeHtml(fileData.file)}" /><span>${escapeHtml(fileData.file)}</span></div>`
@@ -1471,13 +1479,19 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
   codeEditor.textContent = safeContent;
   codeEditor.tabIndex = 0;
   codeEditor.focus();
+  const MINIMAP_BASE_WIDTH = DEFAULT_SETTINGS.editorMinimapWidth;
   const MINIMAP_LINE_HEIGHT = 3;
   const MINIMAP_CHAR_WIDTH = 2;
+  const MINIMAP_FONT_SIZE = 4;
+  const minimapScale = () => getMinimapWidth() / MINIMAP_BASE_WIDTH;
   const drawMinimap = () => {
     const lines = codeEditor.innerText.replace(/\r\n/g, '\n').split('\n');
-    const width = 120;
-    const fontSize = 4;
-    const height = Math.min(lines.length * MINIMAP_LINE_HEIGHT + fontSize, 6000);
+    const width = getMinimapWidth();
+    const scale = minimapScale();
+    const fontSize = MINIMAP_FONT_SIZE * scale;
+    const lineHeight = MINIMAP_LINE_HEIGHT * scale;
+    const charWidth = MINIMAP_CHAR_WIDTH * scale;
+    const height = Math.min(lines.length * lineHeight + fontSize, 6000);
     const ratio = window.devicePixelRatio || 1;
     minimapCanvas.width = width * ratio;
     minimapCanvas.height = height * ratio;
@@ -1496,9 +1510,9 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
     lines.forEach((line, index) => {
       const trimmed = line.trimStart();
       if (!trimmed) return;
-      const indent = (line.length - trimmed.length) * MINIMAP_CHAR_WIDTH;
-      const y = index * MINIMAP_LINE_HEIGHT;
-      let x = Math.min(indent, width - 4);
+      const indent = (line.length - trimmed.length) * charWidth;
+      const y = index * lineHeight;
+      let x = Math.min(indent, width - 4 * scale);
       const isComment = /^(\/\/|\/\*|\*|#)/.test(trimmed);
       const tokens = trimmed.match(/("[^"]*"|'[^']*'|`[^`]*`)|(\b\d+(?:\.\d+)?\b)|(\b(?:function|const|let|var|return|if|else|for|while|import|export|from|class|new|async|await|try|catch|throw|typeof|this|def|public|private|static|void|int|string|bool)\b)|(\w+|\S)/g) || [];
       tokens.forEach((token) => {
@@ -1511,7 +1525,7 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
         else if (/^[A-Z]/.test(token)) color = '#4ec9b0';
         context.fillStyle = color;
         context.fillText(token, x, y + 0.5);
-        x += context.measureText(token).width + 1;
+        x += context.measureText(token).width + scale;
       });
     });
     updateMinimapViewport();
@@ -1525,12 +1539,13 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
       return;
     }
     minimapViewport.style.display = 'block';
+    const scale = minimapScale();
     const contentLines = scrollHeight / parseFloat(getComputedStyle(codeEditor).lineHeight || 18);
-    const totalMinimapHeight = contentLines * MINIMAP_LINE_HEIGHT;
+    const totalMinimapHeight = contentLines * MINIMAP_LINE_HEIGHT * scale;
     const viewportTop = (codeEditor.scrollTop / scrollHeight) * Math.min(canvasHeight, totalMinimapHeight);
     const viewportHeight = (clientHeight / scrollHeight) * Math.min(canvasHeight, totalMinimapHeight);
     minimapViewport.style.top = `${Math.max(0, viewportTop)}px`;
-    minimapViewport.style.height = `${Math.max(14, viewportHeight)}px`;
+    minimapViewport.style.height = `${Math.max(14 * scale, viewportHeight)}px`;
   };
   const minimapScrollTo = (clientY) => {
     const bounds = minimap.getBoundingClientRect();
@@ -1547,6 +1562,7 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
   window.addEventListener('mousemove', (event) => { if (minimapDragging) minimapScrollTo(event.clientY); });
   window.addEventListener('mouseup', () => { minimapDragging = false; });
   new ResizeObserver(() => { updateMinimapViewport(); }).observe(codeEditor);
+  activeMinimapRefresh = drawMinimap;
   drawMinimap();
 
   codeEditor.addEventListener('scroll', () => {
@@ -1636,6 +1652,11 @@ function normalizeSettingValue(option, value) {
   return value;
 }
 
+function getMinimapWidth() {
+  const width = normalizeSettingValue(findSettingOption('editorMinimapWidth'), settings.editorMinimapWidth);
+  return Number.isFinite(width) ? width : DEFAULT_SETTINGS.editorMinimapWidth;
+}
+
 function setSetting(key, value) {
   if (!(key in DEFAULT_SETTINGS)) return;
   settings = { ...settings, [key]: normalizeSettingValue(findSettingOption(key), value) };
@@ -1648,9 +1669,11 @@ function applySettings() {
   const root = document.documentElement;
   root.style.setProperty('--vuppo-code-font-size', `${settings.editorFontSize}px`);
   root.style.setProperty('--vuppo-code-tab-size', `${settings.editorTabSize}`);
+  root.style.setProperty('--vuppo-minimap-width', `${getMinimapWidth()}px`);
   document.body.classList.toggle('vuppo-nowrap-code', settings.editorWordWrap === false);
   document.body.classList.toggle('vuppo-hide-line-numbers', settings.editorLineNumbers === false);
   document.body.classList.toggle('vuppo-hide-minimap', settings.editorMinimap === false);
+  activeMinimapRefresh?.();
   applySeverityFilter();
 }
 

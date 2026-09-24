@@ -202,8 +202,8 @@ button { cursor:pointer; }
 .home-window-controls { margin-left:4px; }
 .dashboard-empty .vuppo-home-mark { margin:0 0 18px; }
 .dashboard-empty .vuppo-home-plan { margin:0 0 26px; color:#8f948e; font-size:11px; }
-.minimap { position:absolute; top:0; right:0; bottom:0; width:120px; overflow:hidden; cursor:pointer; background:transparent; }
-.editor-content { position:relative; padding-right:128px; }
+.minimap { position:absolute; top:0; right:0; bottom:0; width:var(--vuppo-minimap-width,120px); overflow:hidden; cursor:pointer; background:transparent; }
+.editor-content { position:relative; padding-right:calc(var(--vuppo-minimap-width,120px) + 8px); }
 .editor-content .image-preview ~ .minimap { display:none; }
 .minimap-canvas { display:block; }
 .minimap-viewport { position:absolute; right:0; width:100%; background:#ffffff14; border:1px solid #ffffff22; box-sizing:border-box; pointer-events:none; }
@@ -510,7 +510,7 @@ button { cursor:pointer; }
 .chat-context-remove:hover { color:#fff; background:#3a3a3a; }
 
 /* ===== Configurações (estilo VS Code) ===== */
-:root { --vuppo-code-font-size:12px; --vuppo-code-tab-size:2; }
+:root { --vuppo-code-font-size:12px; --vuppo-code-tab-size:2; --vuppo-minimap-width:120px; }
 .code-editor, .workspace .code-preview, .report .code-preview { font-size:var(--vuppo-code-font-size,12px); tab-size:var(--vuppo-code-tab-size,2); }
 body.vuppo-nowrap-code .code-editor, body.vuppo-nowrap-code .workspace .code-preview, body.vuppo-nowrap-code .report .code-preview { white-space:pre; }
 body.vuppo-hide-line-numbers .editor-content .line-numbers { display:none; }
