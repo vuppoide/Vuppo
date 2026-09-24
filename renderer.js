@@ -8,6 +8,7 @@ const $ = (selector) => document.querySelector(selector);
 
 const SETTINGS_STORAGE_KEY = 'vuppo.settings';
 const VUPPO_VERSION = '1.0.0';
+const CHAT_HISTORY_LIMIT = 20;
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const DEFAULT_SETTINGS = {
   editorFontSize: 12,
@@ -18,11 +19,7 @@ const DEFAULT_SETTINGS = {
   editorTabSize: 2,
   autoSave: 'off',
   autoSaveDelay: 1000,
-  chatSendOnEnter: true,
-  chatAutoScroll: true,
-  chatIncludeActiveFile: false,
   chatConfirmClearHistory: true,
-  chatHistoryLimit: 20,
   chatFontSize: 11,
   securityMinSeverity: 'all',
   gitConfirmDiscard: true,
@@ -44,11 +41,7 @@ const SETTINGS_SCHEMA = [
     { key: 'autoSaveDelay', type: 'number', label: 'Atraso do salvamento automático', description: 'Tempo em milissegundos após digitar antes de salvar (requer autoSave: afterDelay).', min: 200, max: 10000, step: 100, isDisabled: (current) => current.autoSave !== 'afterDelay' },
   ] },
   { id: 'chat', label: 'Chat', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/></svg>', options: [
-    { key: 'chatSendOnEnter', type: 'checkbox', label: 'Enviar mensagem com Enter', description: 'Quando desativado, use Ctrl+Enter para enviar e o Enter insere uma nova linha.' },
-    { key: 'chatAutoScroll', type: 'checkbox', label: 'Rolagem automática', description: 'Mantém o chat sempre posicionado na mensagem mais recente.' },
-    { key: 'chatIncludeActiveFile', type: 'checkbox', label: 'Anexar o arquivo aberto ao contexto', description: 'Adiciona automaticamente o arquivo ativo do editor aos chips de contexto ao enviar uma mensagem.' },
     { key: 'chatConfirmClearHistory', type: 'checkbox', label: 'Confirmar antes de excluir conversas', description: 'Pede confirmação ao excluir uma conversa do histórico ou todo o histórico do chat.' },
-    { key: 'chatHistoryLimit', type: 'number', label: 'Limite de conversas no histórico', description: 'Quantidade máxima de conversas arquivadas mantidas no histórico do chat.', min: 5, max: 100, step: 5 },
     { key: 'chatFontSize', type: 'number', label: 'Tamanho da fonte do chat', description: 'Tamanho da fonte usado nas mensagens e no campo de texto do chat.', min: 10, max: 18, step: 1 },
   ] },
   { id: 'security', label: 'Segurança', icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 5.5v5c0 4.6 3 8.4 7 10 4-1.6 7-5.4 7-10v-5Z"/><path d="m9.3 12 2 2 3.4-3.8"/></svg>', options: [
@@ -567,15 +560,14 @@ function setupWorkspaceControls(workspace) {
   const archiveActiveChatSession = () => {
     if (!activeChatSession?.messages.length || chatSessions.includes(activeChatSession)) return;
     chatSessions.unshift(activeChatSession);
-    const limit = Number(getSettings().chatHistoryLimit);
-    if (Number.isFinite(limit) && limit > 0 && chatSessions.length > limit) chatSessions.length = limit;
+    if (chatSessions.length > CHAT_HISTORY_LIMIT) chatSessions.length = CHAT_HISTORY_LIMIT;
   };
   const appendChatMessageElement = (text, className) => {
     const messageElement = document.createElement('div');
     messageElement.className = `chat-message ${className}`;
     messageElement.textContent = text;
     chatThread.appendChild(messageElement);
-    if (getSettings().chatAutoScroll !== false) chatThread.scrollTop = chatThread.scrollHeight;
+    chatThread.scrollTop = chatThread.scrollHeight;
     return messageElement;
   };
   const appendChatMessage = (message, className) => {
@@ -650,19 +642,9 @@ function setupWorkspaceControls(workspace) {
       chatHistoryList.appendChild(item);
     });
   };
-  const attachActiveEditorFileToContext = () => {
-    if (getSettings().chatIncludeActiveFile !== true || !currentReport) return;
-    const activeFile = document.querySelector('.workspace .editor-tab.active')?.dataset.file;
-    if (!activeFile) return;
-    const normalized = normalizeTreePath(activeFile);
-    if (!normalized || chatContextEntries.some((entry) => entry.path === normalized)) return;
-    chatContextEntries.push({ path: normalized, isFolder: false, projectPath: currentReport.projectPath });
-    renderChatContextChips();
-  };
   const sendChatMessage = () => {
     const message = chatMessageInput.value.trim();
     if (!message) return;
-    attachActiveEditorFileToContext();
     appendChatMessage(message, 'chat-message-user');
     chatMessageInput.value = '';
     chatMessageInput.style.height = '';
@@ -685,8 +667,7 @@ function setupWorkspaceControls(workspace) {
     chatMessageInput.focus();
   });
   chatMessageInput.addEventListener('keydown', (event) => {
-    const sendOnEnter = getSettings().chatSendOnEnter !== false;
-    if (event.key === 'Enter' && !event.shiftKey && (sendOnEnter ? true : event.ctrlKey || event.metaKey)) {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       sendChatMessage();
     }
