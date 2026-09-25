@@ -1,0 +1,40 @@
+(async () => {
+  const out = [];
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  document.querySelector('#auth-shell')?.classList.add('hidden');
+  document.querySelector('#app-shell')?.classList.remove('hidden');
+  out.push('editor.js carregado=' + (typeof window.VuppoEditor === 'object'));
+  await window.analyzeProject(window.__vuppoTest.projectPath);
+  await wait(5000);
+  const diag = window.VuppoEditor.__diagnostics();
+  out.push('diag=' + JSON.stringify({ ready: diag.ready, languageCount: diag.languageCount, completionLanguages: diag.completionLanguages.length, keywordLanguages: diag.keywordLanguages, snippetLanguages: diag.snippetLanguages, open: diag.open, language: diag.language, file: diag.file, valueLength: diag.valueLength }));
+  out.push('languageFor=' + JSON.stringify({ js: window.VuppoEditor.languageFor('src/app.js'), py: window.VuppoEditor.languageFor('script.py'), docker: window.VuppoEditor.languageFor('Dockerfile'), env: window.VuppoEditor.languageFor('.env'), html: window.VuppoEditor.languageFor('index.html'), csv: window.VuppoEditor.languageFor('dados.csv'), rs: window.VuppoEditor.languageFor('main.rs') }));
+  const colors = new Set([...document.querySelectorAll('.workspace-editor .view-lines span[class*=mtk]')].map((node) => node.className.trim()));
+  out.push('cores aplicadas=' + colors.size + ' ' + JSON.stringify([...colors].slice(0, 12)));
+  out.push('linha html=' + JSON.stringify((document.querySelector('.workspace-editor .view-lines')?.innerHTML || '').slice(0, 240)));
+  const instance = window.monaco.editor.getEditors()[0];
+  const rowsOf = () => [...document.querySelectorAll('.workspace-editor .suggest-widget .monaco-list-row')].map((row) => row.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  instance.setPosition({ lineNumber: 5, column: 9 });
+  instance.trigger('vuppo-test', 'editor.action.triggerSuggest', {});
+  await wait(2500);
+  out.push('suggest JS nativo: linhas=' + rowsOf().length + ' ' + JSON.stringify(rowsOf().slice(0, 4)));
+  instance.trigger('vuppo-test', 'hideSuggestWidget', {});
+  window.selectWorkspaceFile('script.py');
+  await wait(3000);
+  out.push('aba python: ' + JSON.stringify({ language: window.VuppoEditor.__diagnostics().language, file: window.VuppoEditor.activeFile(), sample: window.VuppoEditor.completionSample().labels.slice(0, 6) }));
+  const pyModel = instance.getModel();
+  const pyLine = pyModel.getLineCount();
+  instance.setPosition({ lineNumber: pyLine, column: pyModel.getLineMaxColumn(pyLine) });
+  instance.trigger('vuppo-test', 'editor.action.triggerSuggest', {});
+  await wait(2500);
+  out.push('suggest PY: linhas=' + rowsOf().length + ' ' + JSON.stringify(rowsOf().slice(0, 6)));
+  instance.trigger('vuppo-test', 'hideSuggestWidget', {});
+  window.VuppoEditor.setValue(window.VuppoEditor.getValue() + '\n# marcado pelo teste e2e\n');
+  out.push('save=' + await window.VuppoEditor.save());
+  window.selectWorkspaceFile('consulta.sql');
+  await wait(2500);
+  out.push('aba SQL: ' + JSON.stringify({ language: window.VuppoEditor.__diagnostics().language, sample: window.VuppoEditor.completionSample('sql').labels.slice(0, 6) }));
+  out.push('diagnostico final=' + JSON.stringify({ open: window.VuppoEditor.isOpen(), language: window.VuppoEditor.__diagnostics().language, completionLanguages: window.VuppoEditor.__diagnostics().completionLanguages.length }));
+  // __PAGE_APPEND__
+  return out;
+})()

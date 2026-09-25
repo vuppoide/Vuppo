@@ -236,6 +236,7 @@ function renderReport() {
     $('#report').insertAdjacentHTML('beforebegin', '<section class="workspace hidden" id="workspace"></section>');
     workspace = $('#workspace');
   }
+  window.VuppoEditor?.disposeAll();
     workspace.innerHTML = `<header class="workspace-topbar"><div class="workspace-brand"><span class="workspace-logo">V</span><strong>Vuppo</strong><span class="workspace-separator">/</span><span>${escapeHtml(currentReport.projectName)}</span></div><nav class="workspace-top-actions" aria-label="Ações do editor"><button class="top-action-button active" type="button" title="Preview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h5M8 16h3"/></svg><span>Preview</span></button><button class="top-action-button" type="button" title="Terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg><span>Terminal</span></button><button class="top-action-button" type="button" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/></svg><span>Chat</span></button><button class="profile-button" type="button" title="Perfil" aria-label="Perfil"><span>U</span></button></nav></header><div class="workspace-body"><nav class="workspace-activity" aria-label="Navegação do projeto"><button class="activity-button active" title="Explorador de arquivos" aria-label="Explorador de arquivos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg></button><button class="activity-button" title="Git" aria-label="Git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg></button><button class="activity-button" title="Extensões" aria-label="Extensões"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4h4v2H3v4a2 2 0 0 0 2 2h4v-4h2v4h4a2 2 0 0 0 2-2v-4h-4V9h4V5a2 2 0 0 0-2-2h-4v4H9V3Z"/></svg></button><button class="activity-button" title="Security Problems" aria-label="Security Problems"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 7v5c0 4.8-3.2 7.7-9 9-5.8-1.3-9-4.2-9-9V7l9-4Z"/><path d="M12 8v4M12 16h.01"/></svg></button><span></span><button class="activity-button" id="workspace-settings" title="Configurações" aria-label="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button></nav>
   </div></div>`;
   workspace.querySelector('.workspace-body').insertAdjacentHTML('beforeend', `<aside class="workspace-sidebar"><div class="sidebar-title">EXPLORER <span>${currentReport.filesScanned}</span></div><section class="explorer-open-editors"><div class="explorer-section-heading">OPEN EDITORS</div><button class="open-editor-item" type="button"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</button></section><div class="file-tree"><div class="tree-folder">${escapeHtml(currentReport.projectName)}</div>${(files.length ? files : [{ file: 'Nenhum arquivo encontrado' }]).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}"><span class="file-dot"></span>${escapeHtml(file.file)}</button>`).join('')}</div><div class="sidebar-bottom"><span>ANALISE</span><strong>${currentReport.findings.length} achados</strong><small>${currentReport.durationMs} ms · ${currentReport.filesScanned} arquivos</small></div></aside><main class="workspace-editor"><div class="editor-tabs"><span class="editor-tab active"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</span></div><div class="editor-content"><div class="line-numbers">${Array.from({ length: Math.max(12, firstFinding ? firstFinding.line + 4 : 12) }, (_, index) => `<span>${index + 1}</span>`).join('')}</div><pre class="code-preview"><code>${escapeHtml(firstFinding ? firstFinding.excerpt : (files[0]?.content || '// Nenhum arquivo encontrado.'))}</code></pre></div><div class="editor-panel-label">PROBLEMS <span>${currentReport.findings.length}</span></div></main><aside class="security-panel"><div class="security-heading"><div><span class="panel-eyebrow">VUPPO SECURITY</span><h2>Security Problems</h2></div><span class="finding-total">${currentReport.findings.length}</span></div><div class="severity-summary"><span><b class="severity-critical">${counts.critical || 0}</b> critical</span><span><b class="severity-high">${counts.high || 0}</b> high</span><span><b class="severity-medium">${counts.medium || 0}</b> medium</span></div><div class="workspace-findings">${currentReport.findings.length ? currentReport.findings.map((finding, index) => `<button class="workspace-finding ${index === 0 ? 'selected' : ''}" data-finding-index="${index}"><span class="finding-severity ${finding.severity}"></span><span><strong>${escapeHtml(finding.title)}</strong><small>${escapeHtml(finding.file)}:${finding.line}</small></span></button>`).join('') : '<div class="workspace-empty-state">Nenhum risco encontrado pelas regras atuais.</div>'}</div></aside><footer class="workspace-statusbar"><span>main</span><span>${escapeHtml(currentReport.projectPath)}</span><span>${currentReport.scannedAt.slice(0, 10)} · ${currentReport.filesScanned} arquivos</span></footer>`);
@@ -334,6 +335,16 @@ function renderReport() {
   openEditorsMenu?.querySelector('[data-open-editor-action="close-all"]')?.addEventListener('click', () => [...workspace.querySelectorAll('.editor-tab')].forEach((tab) => closeEditorTab(tab.dataset.file)));
   $('#workspace-close')?.addEventListener('click', closeWorkspaceFolder);
   applySettings();
+  openInitialWorkspaceFile(firstFinding, files);
+}
+
+// Abre o arquivo do primeiro achado (ou o primeiro arquivo) já no editor Monaco,
+// para que o realce de sintaxe apareça assim que o projeto é analisado.
+function openInitialWorkspaceFile(firstFinding, files) {
+  if (!window.VuppoEditor) return;
+  const initialFile = firstFinding?.file || files?.[0]?.file;
+  if (!initialFile) return;
+  try { selectWorkspaceFile(initialFile); } catch { /* mantém a prévia estática */ }
 }
 
 function resolveProjectPreviewUrl() {
@@ -390,7 +401,7 @@ function setupWorkspaceControls(workspace) {
       return;
     }
     const action = event.target.closest('[data-editor-action]')?.dataset.editorAction;
-    if (action === 'save') editorTabs.closest('.workspace-editor').querySelector('.code-editor')?.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true }));
+    if (action === 'save') saveActiveEditor();
     if (action === 'close') closeActiveEditor();
     if (action === 'close-all') [...editorTabs.querySelectorAll('.editor-tab')].forEach((tab) => closeEditorTab(tab.dataset.file));
     if (action) editorTabs.querySelector('.editor-tabs-menu')?.classList.add('hidden');
@@ -1433,7 +1444,7 @@ function syncWorkspaceFileMenu() {
   const workspace = document.querySelector('.workspace');
   if (!workspace) return;
   const hasOpenEditor = Boolean(workspace.querySelector('.editor-tab'));
-  const canSave = hasOpenEditor && Boolean(workspace.querySelector('.code-editor'));
+  const canSave = hasOpenEditor && (Boolean(workspace.querySelector('.code-editor')) || Boolean(window.VuppoEditor?.isOpen()));
   const state = { save: canSave, 'save-as': canSave, 'save-all': canSave, 'close-editor': hasOpenEditor };
   Object.entries(state).forEach(([action, enabled]) => {
     const button = workspace.querySelector(`[data-file-action="${action}"]`);
@@ -1478,6 +1489,7 @@ function closeEditorTab(file) {
   const tabs = document.querySelector('.editor-tabs');
   const tab = [...(tabs?.querySelectorAll('.editor-tab') || [])].find((item) => item.dataset.file === file);
   if (!tab) return;
+  window.VuppoEditor?.close(file);
   const wasActive = tab.classList.contains('active');
   tab.remove();
   updateEditorTabsMenuVisibility();
@@ -1487,6 +1499,7 @@ function closeEditorTab(file) {
   if (nextTab) selectWorkspaceFile(nextTab.dataset.file);
   else {
     activeMinimapRefresh = null;
+    window.VuppoEditor?.disposeAll();
     document.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
   }
 }
@@ -1504,11 +1517,36 @@ function renderWorkspaceFile(fileData, findingLine, fallbackText) {
     editorContent.innerHTML = fileData.content
       ? `<div class="image-preview"><header class="image-preview-heading"><span class="image-preview-name">${escapeHtml(fileData.file.split(/[\\/]/).pop())}</span><button class="image-preview-close" type="button" title="Fechar imagem" aria-label="Fechar imagem">×</button></header><img src="${fileData.content}" alt="${escapeHtml(fileData.file)}" /><span>${escapeHtml(fileData.file)}</span></div>`
       : `<div class="image-preview image-preview-empty"><header class="image-preview-heading"><span class="image-preview-name">${escapeHtml(fileData.file.split(/[\\/]/).pop())}</span><button class="image-preview-close" type="button" title="Fechar imagem" aria-label="Fechar imagem">×</button></header><strong>Imagem muito grande para a prévia</strong><span>Abra o arquivo para visualizar a imagem.</span></div>`;
+    window.VuppoEditor?.disposeAll();
     editorContent.querySelector('.image-preview-close')?.addEventListener('click', closeActiveEditor);
     return;
   }
   const content = fileData.content ?? fallbackText ?? '// Arquivo sem conteúdo legível.';
   const safeContent = typeof content === 'string' && content.trim().length > 0 ? content : (fallbackText || '// Arquivo vazio ou não legível.');
+  if (window.VuppoEditor) {
+    window.VuppoEditor.open(editorContent, {
+      file: fileData.file,
+      value: safeContent,
+      line: findingLine,
+      projectPath: currentReport?.projectPath || '',
+      language: window.VuppoEditor.languageFor(fileData.file),
+      settings: getSettings(),
+      onChange: (value) => { fileData.content = value; },
+      onSave: async (value) => {
+        fileData.content = value;
+        if (fileData.external) await window.vuppo.writeFilePath({ filePath: fileData.absoluteFile, content: value });
+        else await window.vuppo.writeFile({ projectPath: currentReport.projectPath, filePath: fileData.absoluteFile, content: value });
+      },
+      onSaveError: (error) => alert(error.message || 'Não foi possível salvar o arquivo.'),
+      fallback: () => renderLegacyFileEditor(editorContent, fileData, findingLine, fallbackText, safeContent),
+    });
+    return;
+  }
+  renderLegacyFileEditor(editorContent, fileData, findingLine, fallbackText, safeContent);
+}
+
+// Editor legado (contenteditable) — usado apenas se o Monaco não puder carregar.
+function renderLegacyFileEditor(editorContent, fileData, findingLine, fallbackText, safeContent) {
   const lineCount = safeContent.split(/\r?\n/).length;
   editorContent.innerHTML = `<div class="line-numbers">${Array.from({ length: Math.max(12, findingLine || lineCount, lineCount) }, (_, line) => `<span>${line + 1}</span>`).join('')}</div><div class="code-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editor de código" spellcheck="false"></div><div class="minimap" aria-hidden="true"><canvas class="minimap-canvas"></canvas><div class="minimap-viewport"></div></div>`;
   const codeEditor = editorContent.querySelector('.code-editor');
@@ -1714,6 +1752,7 @@ function applySettings(changedKey) {
   document.body.classList.toggle('vuppo-nowrap-code', settings.editorWordWrap === false);
   document.body.classList.toggle('vuppo-hide-line-numbers', settings.editorLineNumbers === false);
   document.body.classList.toggle('vuppo-hide-minimap', settings.editorMinimap === false);
+  window.VuppoEditor?.applySettings(settings);
   activeMinimapRefresh?.();
   if (currentReport?.gitStatus && (!changedKey || changedKey.startsWith('git'))) renderSourceControlView();
   applySeverityFilter();
@@ -2552,6 +2591,7 @@ function addExplorerEntryToChat(relativePath, isFolder) {
 }
 
 function closeWorkspaceFolder() {
+  window.VuppoEditor?.disposeAll();
   document.querySelector('.workspace')?.classList.add('hidden');
   document.querySelector('.recent-menu')?.classList.add('hidden');
   $('#dashboard-empty')?.classList.remove('hidden');
@@ -2559,6 +2599,7 @@ function closeWorkspaceFolder() {
 }
 
 function saveActiveEditor() {
+  if (window.VuppoEditor?.isOpen()) { window.VuppoEditor.save(); return; }
   document.querySelector('.code-editor')?.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true }));
 }
 
@@ -2586,12 +2627,13 @@ async function openFileFromDialog() {
 
 async function saveActiveEditorAs() {
   const codeEditor = document.querySelector('.code-editor');
+  const monacoOpen = Boolean(window.VuppoEditor?.isOpen());
   const activeTab = document.querySelector('.editor-tab.active');
-  if (!codeEditor || !activeTab?.dataset.file) {
+  if ((!codeEditor && !monacoOpen) || !activeTab?.dataset.file) {
     alert('Abra um arquivo para salvar.');
     return;
   }
-  const content = codeEditor.innerText.replace(/\r\n/g, '\n');
+  const content = monacoOpen ? window.VuppoEditor.getValue() : codeEditor.innerText.replace(/\r\n/g, '\n');
   try {
     const savedPath = await window.vuppo.saveFileAs({ defaultPath: activeTab.dataset.file, content });
     if (!savedPath) return;
@@ -2601,8 +2643,10 @@ async function saveActiveEditorAs() {
       fileData.content = content;
       fileData.external = true;
     }
-    codeEditor.classList.add('saved');
-    setTimeout(() => codeEditor.classList.remove('saved'), 700);
+    if (codeEditor) {
+      codeEditor.classList.add('saved');
+      setTimeout(() => codeEditor.classList.remove('saved'), 700);
+    }
   } catch (error) {
     alert(error.message || 'Não foi possível salvar o arquivo.');
   }

@@ -38,6 +38,8 @@
       "assets/codicons/**",
       "assets/material-icons/**",
       "assets/material-icons.json",
+      "editor.js",
+      "node_modules/monaco-editor/min/**/*",
       "package.json"
     ],
     "win": {
