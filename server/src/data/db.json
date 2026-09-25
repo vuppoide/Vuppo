@@ -1,0 +1,75 @@
+{
+  "accounts": [
+    {
+      "id": "e069f47c-7555-4300-ad0c-f785e5c01bb7",
+      "name": "Tester Admin",
+      "email": "test@vuppo.security",
+      "provider": "email",
+      "hash": "19f397b0812307170115944dc8e7c7bb701cb93deaebafcbcf13ad7beee2184e607b8d0ad73197c21ebaa6946450ed531db786162f68f04ca748dd935cecb274",
+      "salt": "80f446eded76facb0ccfd4b36b1f391c",
+      "plan": "free",
+      "credits": {
+        "cycle": "2026-09",
+        "used": 1,
+        "history": [
+          {
+            "label": "Auditoria de 1 arquivos",
+            "credits": 1,
+            "files": 1,
+            "at": "2026-09-25T15:09:19.077Z"
+          }
+        ]
+      },
+      "tokens": [
+        "d5200e629d55ab12acc3038f596367cc172bce47cec73db57f49435ce4d757cc"
+      ],
+      "createdAt": "2026-09-25T15:09:19.068Z"
+    }
+  ],
+  "reports": [
+    {
+      "id": "d9966541-75d2-42ee-808b-b21c82f48ff2",
+      "userId": "e069f47c-7555-4300-ad0c-f785e5c01bb7",
+      "projectName": "Snippet / Direct Scan",
+      "filesScanned": 1,
+      "analyzedFiles": 1,
+      "findings": [
+        {
+          "id": "hardcoded-secret-0",
+          "ruleId": "hardcoded-secret",
+          "title": "Possível segredo exposto",
+          "severity": "critical",
+          "category": "Credenciais",
+          "advice": "Remova o valor do código, revogue a credencial e use variáveis de ambiente ou um cofre de segredos.",
+          "file": "vulnerable.js",
+          "line": 1,
+          "excerpt": "const apiKey = \"AKIA1234567890EXAMPLE\";"
+        },
+        {
+          "id": "eval-2",
+          "ruleId": "eval",
+          "title": "Uso de eval ou código dinâmico",
+          "severity": "high",
+          "category": "Injeção",
+          "advice": "Remova a execução dinâmica. Use parsing estruturado e validação explícita do formato recebido.",
+          "file": "vulnerable.js",
+          "line": 3,
+          "excerpt": "eval(\"alert(1)\");"
+        },
+        {
+          "id": "debug-enabled-1",
+          "ruleId": "debug-enabled",
+          "title": "Modo de debug em produção",
+          "severity": "low",
+          "category": "Configuração",
+          "advice": "Desative debug no ambiente de produção para evitar vazamento de stack traces e configurações.",
+          "file": "vulnerable.js",
+          "line": 2,
+          "excerpt": "const debug = true;"
+        }
+      ],
+      "durationMs": 1,
+      "scannedAt": "2026-09-25T15:09:19.077Z"
+    }
+  ]
+}

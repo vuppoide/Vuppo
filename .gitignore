@@ -6,3 +6,6 @@ build/
 *.asar
 .DS_Store
 Thumbs.db
+server/.env
+server/data/*.json
+
