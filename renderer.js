@@ -575,24 +575,25 @@ function setupWorkspaceControls(workspace) {
     chatSessions.unshift(activeChatSession);
     if (chatSessions.length > CHAT_HISTORY_LIMIT) chatSessions.length = CHAT_HISTORY_LIMIT;
   };
-  const appendChatMessageElement = (text, className) => {
+  const appendChatMessageElement = (text, className, isMarkdown) => {
     const messageElement = document.createElement('div');
     messageElement.className = `chat-message ${className}`;
-    messageElement.textContent = text;
+    if (isMarkdown) messageElement.innerHTML = renderChatMarkdown(text);
+    else messageElement.textContent = text;
     chatThread.appendChild(messageElement);
     chatThread.scrollTop = chatThread.scrollHeight;
     return messageElement;
   };
-  const appendChatMessage = (message, className) => {
+  const appendChatMessage = (message, className, isMarkdown) => {
     if (!activeChatSession) activeChatSession = { id: `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`, title: '', messages: [], createdAt: new Date() };
     activeChatSession.messages.push({ text: message, className });
-    appendChatMessageElement(message, className);
+    appendChatMessageElement(message, className, isMarkdown);
   };
   const appendChatNotice = (text) => appendChatMessageElement(text, 'chat-message-system');
   const renderChatThread = (session) => {
-    chatThread.querySelectorAll('.chat-message').forEach((message) => message.remove());
+    chatThread.querySelectorAll('.chat-message,.chat-approval-card').forEach((message) => message.remove());
     if (!session) return;
-    session.messages.forEach((item) => appendChatMessageElement(item.text, item.className));
+    session.messages.forEach((item) => appendChatMessageElement(item.text, item.className, item.className === 'chat-message-ai'));
   };
   const deleteChatSession = (session) => {
     if (getSettings().chatConfirmClearHistory !== false && !confirm('Excluir esta conversa do histórico?')) return;
@@ -655,12 +656,163 @@ function setupWorkspaceControls(workspace) {
       chatHistoryList.appendChild(item);
     });
   };
-  const sendChatMessage = () => {
+  const CHAT_API_URL = 'http://localhost:4000/api/chat';
+  let chatPending = false;
+  const getActiveProjectPath = () => {
+    try {
+      if (typeof currentReport === 'object' && currentReport && currentReport.projectPath) return currentReport.projectPath;
+    } catch (err) { /* sem projeto aberto */ }
+    return '';
+  };
+  const escapeChatHtml = (text) => String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const AGENT_TOOL_LABELS = {
+    ler_arquivo: 'leu o arquivo', listar_pasta: 'listou a pasta',
+    buscar_no_codigo: 'buscou no código', auditar_arquivo: 'auditou o arquivo',
+    editar_arquivo: 'editou o arquivo', executar_comando: 'executou o comando'
+  };
+  const agentToolsLabel = (tool) => AGENT_TOOL_LABELS[tool] || tool;
+  const chatStepTarget = (args) => {
+    const target = args && (args.path || args.command || args.query);
+    return target ? ` — ${target}` : '';
+  };
+  const renderChatMarkdown = (text) => {
+    const parts = String(text).split(/(```[\s\S]*?```)/g);
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return `<pre class="chat-code-block"><code>${escapeChatHtml(part.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, ''))}</code></pre>`;
+      }
+      let html = escapeChatHtml(part);
+      html = html.replace(/`([^`\n]+)`/g, '<code class="chat-code-inline">$1</code>');
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/(^|\n)((?:\s*[-*] .+(?:\n|$))+)/g, (m, pre, list) => {
+        const items = list.trim().split(/\n/).map((line) => `<li>${line.replace(/^\s*[-*] /, '')}</li>`).join('');
+        return `${pre}<ul class="chat-list">${items}</ul>`;
+      });
+      return html.replace(/\n/g, '<br>');
+    }).join('');
+  };
+  const buildChatMessages = () => {
+    const turn = (activeChatSession?.messages || [])
+      .filter((item) => item.className === 'chat-message-user' || item.className === 'chat-message-ai')
+      .map((item) => ({ role: item.className === 'chat-message-user' ? 'user' : 'assistant', content: item.text }));
+    const contextParts = (typeof chatContextEntries !== 'undefined' ? chatContextEntries : [])
+      .filter((e) => e && e.path && e.projectPath === getActiveProjectPath())
+      .map((e) => `- ${e.isFolder ? 'pasta' : 'arquivo'}: ${e.path}`);
+    if (contextParts.length && turn.length && turn[turn.length - 1].role === 'user') {
+      turn[turn.length - 1] = {
+        role: 'user',
+        content: `${turn[turn.length - 1].content}\n\n[Contexto anexado pelo usuario]\n${contextParts.join('\n')}`
+      };
+    }
+    return turn;
+  };
+  const showChatApproval = (pending) => {
+    const card = document.createElement('div');
+    card.className = 'chat-approval-card';
+    const argsJson = (() => { try { return JSON.stringify(pending.args || {}, null, 2); } catch (e) { return ''; } })();
+    card.innerHTML = `<strong>Ação proposta pela IA</strong><span>${escapeChatHtml(pending.description || pending.tool)}</span>${argsJson ? `<pre class="chat-approval-args"><code>${escapeChatHtml(argsJson.length > 1200 ? `${argsJson.slice(0, 1200)}\n…` : argsJson)}</code></pre>` : ''}`;
+    const row = document.createElement('div');
+    row.className = 'chat-approval-actions';
+    const btnOk = document.createElement('button');
+    btnOk.type = 'button';
+    btnOk.className = 'chat-approval-ok';
+    btnOk.textContent = 'Aprovar';
+    const btnNo = document.createElement('button');
+    btnNo.type = 'button';
+    btnNo.className = 'chat-approval-no';
+    btnNo.textContent = 'Recusar';
+    btnOk.addEventListener('click', () => resolveChatApproval(pending.actionId, true, card));
+    btnNo.addEventListener('click', () => resolveChatApproval(pending.actionId, false, card));
+    row.append(btnOk, btnNo);
+    card.appendChild(row);
+    chatThread.appendChild(card);
+    chatThread.scrollTop = chatThread.scrollHeight;
+  };
+  const resolveChatApproval = async (actionId, approved, card) => {
+    card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    const pendingElement = appendChatMessageElement(approved ? 'Ação aprovada. Executando…' : 'Ação recusada.', 'chat-message-system');
+    try {
+      const response = await fetch(`${CHAT_API_URL}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actionId, approved })
+      });
+      const payload = await response.json().catch(() => ({}));
+      pendingElement.remove();
+      if (!response.ok) throw new Error(payload.error || `O backend respondeu com erro ${response.status}.`);
+      if (Array.isArray(payload.steps)) {
+        payload.steps.slice(chatShownSteps).forEach((s) => appendChatNotice(`Executado: ${agentToolsLabel(s.tool)}${chatStepTarget(s.args)}`));
+        chatShownSteps = payload.steps.length;
+      }
+      card.remove();
+      appendChatNotice(approved ? 'Ação executada.' : 'Ação recusada por voce.');
+      const reply = String(payload.reply || '').trim();
+      if (reply) appendChatMessage(reply, 'chat-message-ai', true);
+    } catch (error) {
+      pendingElement.remove();
+      card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+      appendChatNotice(`Nao foi possivel concluir a acao: ${error.message}`);
+    } finally {
+      chatPending = false;
+      const sendButton = chatPanel.querySelector('.chat-send');
+      if (sendButton) sendButton.disabled = false;
+    }
+  };
+  let chatShownSteps = 0;
+  const sendChatMessage = async () => {
     const message = chatMessageInput.value.trim();
-    if (!message) return;
+    if (!message || chatPending) return;
     appendChatMessage(message, 'chat-message-user');
     chatMessageInput.value = '';
     chatMessageInput.style.height = '';
+
+    chatPending = true;
+    const sendButton = chatPanel.querySelector('.chat-send');
+    if (sendButton) sendButton.disabled = true;
+    const pendingElement = appendChatMessageElement('Pensando…', 'chat-message-system');
+
+    try {
+      const requestBody = JSON.stringify({ messages: buildChatMessages(), projectPath: getActiveProjectPath() });
+      chatShownSteps = 0;
+      let response = null;
+      let networkError = null;
+      // Primeira tentativa com uma repetição: cobre o caso do backend ainda estar subindo.
+      for (let attempt = 0; attempt < 2 && !response; attempt += 1) {
+        try {
+          response = await fetch(CHAT_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: requestBody
+          });
+        } catch (err) {
+          networkError = err;
+          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+      if (!response) throw networkError || new Error('Falha de conexão com o backend.');
+      const payload = await response.json().catch(() => ({}));
+      pendingElement.remove();
+      if (!response.ok) throw new Error(payload.error || `O backend respondeu com erro ${response.status}.`);
+      if (Array.isArray(payload.steps)) {
+        payload.steps.forEach((s) => appendChatNotice(`Executado: ${agentToolsLabel(s.tool)}${chatStepTarget(s.args)}`));
+        chatShownSteps = payload.steps.length;
+      }
+      const reply = String(payload.reply || '').trim();
+      if (!reply && !payload.pendingApproval) throw new Error('A IA retornou uma resposta vazia. Tente novamente.');
+      if (reply) appendChatMessage(reply, 'chat-message-ai', true);
+      if (payload.pendingApproval) showChatApproval(payload.pendingApproval);
+    } catch (error) {
+      pendingElement.remove();
+      const hint = /Failed to fetch|NetworkError|fetch/i.test(error.message)
+        ? ' Verifique se o backend está rodando (npm start na pasta server).'
+        : '';
+      appendChatNotice(`Não foi possível responder: ${error.message}${hint}`);
+    } finally {
+      chatPending = false;
+      if (sendButton) sendButton.disabled = false;
+    }
   };
   chatPanel.querySelector('.chat-attach').addEventListener('click', () => chatFileInput.click());
   chatFileInput.addEventListener('change', () => {

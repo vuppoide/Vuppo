@@ -31,6 +31,46 @@ const GITHUB_CLI_TIMEOUT = 5 * 60 * 1000;
 const CREDITS_PER_ANALYZED_FILE = 1;
 const githubConnections = new Map();
 
+// Backend local da VUPPO (chat com IA via OpenRouter). Sobe automaticamente
+// junto com o app para que o chat funcione sem precisar rodar `npm start` manualmente.
+const BACKEND_PORT = process.env.VUPPO_BACKEND_PORT || 4000;
+const BACKEND_HEALTH_URL = `http://localhost:${BACKEND_PORT}/api/health`;
+let backendProcess = null;
+
+async function isBackendOnline() {
+  if (typeof fetch !== 'function') return false;
+  try {
+    const response = await fetch(BACKEND_HEALTH_URL, { signal: AbortSignal.timeout(2000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function startBackend() {
+  try {
+    if (await isBackendOnline()) return; // já rodando (ex.: iniciado manualmente)
+    const backendEntry = path.join(__dirname, 'server', 'src', 'server.js');
+    if (!fs.existsSync(backendEntry)) return; // build/dist sem a pasta server
+    backendProcess = spawn('node', [backendEntry], {
+      cwd: path.join(__dirname, 'server'),
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    backendProcess.on('error', () => { backendProcess = null; });
+    backendProcess.on('exit', () => { backendProcess = null; });
+  } catch {
+    backendProcess = null;
+  }
+}
+
+function stopBackend() {
+  if (backendProcess && backendProcess.exitCode === null) {
+    try { backendProcess.kill(); } catch { /* processo já encerrado */ }
+  }
+  backendProcess = null;
+}
+
 function runProcess(command, args, options = {}) {
   return new Promise((resolve) => {
     execFile(command, args, { windowsHide: true, maxBuffer: 4 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
@@ -230,6 +270,7 @@ async function createWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
+  startBackend();
   const auth = createAuthStore(app.getPath('userData'));
   const terminalSessions = new Map();
   ipcMain.handle('auth-session', () => auth.getSession());
@@ -486,4 +527,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  stopBackend();
 });

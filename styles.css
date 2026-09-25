@@ -308,6 +308,21 @@ button { cursor:pointer; }
 .chat-message-system { max-width:100%; margin:10px auto; border:1px dashed #2b2b2b; color:#9a9a9a; background:transparent; text-align:center; font-size:10px; }
 .chat-message { max-width:84%; margin:8px 0; padding:8px 10px; border-radius:6px; color:#d6d6d6; background:#1f1f1f; font:11px/1.4 Manrope,Arial,sans-serif; font-size:var(--vuppo-chat-font-size,11px); }
 .chat-message-user { margin-left:auto; background:#282828; }
+.chat-message-ai { border-left:2px solid #3b82f6; white-space:normal; word-break:break-word; }
+.chat-message-ai strong { color:#f0f0f0; }
+.chat-message-ai .chat-code-inline { padding:1px 5px; border-radius:4px; color:#ffd479; background:#0f0f0f; font-family:Consolas,monospace; font-size:10px; }
+.chat-message-ai .chat-code-block { margin:8px 0; padding:8px; border-radius:6px; background:#0f0f0f; overflow:auto; }
+.chat-message-ai .chat-code-block code { color:#c8e6c9; font-family:Consolas,monospace; font-size:10px; white-space:pre; }
+.chat-message-ai .chat-list { margin:6px 0; padding-left:18px; }
+.chat-message-ai .chat-list li { margin:2px 0; }
+.chat-approval-card { margin:8px 0; padding:10px; border:1px solid #b8860b; border-radius:6px; background:#221d0c; display:flex; flex-direction:column; gap:8px; font:11px Manrope,Arial,sans-serif; }
+.chat-approval-card strong { color:#ffd479; font-size:11px; }
+.chat-approval-card span { color:#e5e5e5; word-break:break-word; }
+.chat-approval-args { margin:0; padding:8px; border-radius:6px; background:#141414; overflow:auto; max-height:220px; }
+.chat-approval-args code { color:#c8e6c9; font-family:Consolas,monospace; font-size:10px; white-space:pre; }
+.chat-approval-actions { display:flex; gap:8px; }
+.chat-approval-ok { border:0; border-radius:4px; padding:6px 12px; color:#fff; background:#2e7d32; }
+.chat-approval-no { border:1px solid #555; border-radius:4px; padding:6px 12px; color:#eee; background:transparent; }
 .chat-message-file { color:#c4c4c4; border:1px dashed #3b3b3b; background:transparent; }
 .chat-composer-footer { display:flex; align-items:center; justify-content:space-between; margin-top:5px; padding:0 2px; }
 .chat-model { border:0; padding:4px 5px; border-radius:3px; color:#a9a9a9; background:transparent; font:10px Manrope,Arial,sans-serif; }

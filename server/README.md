@@ -55,6 +55,19 @@ O servidor estará disponível em `http://localhost:4000`.
 - `GET /api/scan/rules` - Retorna as regras de segurança ativas no auditor.
 - `GET /api/scan/history` - Retorna os relatórios salvos do usuário autenticado (*Bearer Token*).
 
+### Chat com IA agêntica (`/api/chat`)
+- `POST /api/chat` - Conversa com a IA, que pode **ler e agir no projeto aberto igual um agente** (estilo Cline).
+  - Body: `{ messages: [{ role: "user"|"assistant"|"system", content: "..." }], projectPath: "C:\\caminho\\do\\projeto" }`.
+  - Resposta: `{ reply: "...", model: "...", steps: [...], pendingApproval?: { actionId, tool, description, args } }`.
+  - Ferramentas automáticas (executam na hora): `ler_arquivo`, `listar_pasta`, `buscar_no_codigo`, `auditar_arquivo`.
+  - Ferramentas com aprovação: `editar_arquivo`, `executar_comando` — retornam `pendingApproval`; confirme em `POST /api/chat/action`.
+  - Respostas vêm em **markdown** (títulos, listas, `código`, blocos ```) e o chat renderiza formatado.
+- `POST /api/chat/action` - Aprova ou recusa uma ação proposta pela IA.
+  - Body: `{ actionId: "act_...", approved: true|false }`.
+  - Resposta: `{ reply: "...", model: "...", steps: [...], actionResult: "executada"|"recusada" }`.
+  - A chave da OpenRouter fica **somente no backend**, nas variáveis `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` do `.env` (nunca no frontend).
+  - Se o modelo principal (`OPENROUTER_MODEL`) estiver com rate limit, a OpenRouter faz failover automático para os modelos de `OPENROUTER_MODEL_FALLBACKS`; o campo `model` da resposta indica qual modelo respondeu.
+
 ---
 
 ## 📁 Estrutura de Pastas

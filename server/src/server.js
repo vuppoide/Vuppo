@@ -4,12 +4,18 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/authRoutes');
 const scanRoutes = require('./routes/scanRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const { errorHandler } = require('./middlewares/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middlewares globais
+// Habilita requisições do app (file://) para a rede local (localhost) no Chromium/Electron (Private Network Access).
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  next();
+});
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -27,6 +33,7 @@ app.get('/api/health', (req, res) => {
 // Rotas da API
 app.use('/api/auth', authRoutes);
 app.use('/api/scan', scanRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Fallback 404
 app.use((req, res) => {
