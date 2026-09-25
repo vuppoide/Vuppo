@@ -120,6 +120,7 @@ function showApp(account) {
   $('#app-shell').classList.add('home-mode');
   $('#account-name').textContent = `${account.name} · ${account.email}`;
   $('#welcome-name').textContent = account.name.split(' ')[0];
+  refreshUsage();
 }
 
 async function submitAuth(event) {
@@ -180,6 +181,7 @@ async function analyzeProject(projectPath) {
     currentReport = await window.vuppo.scanProject(projectPath);
     rememberProject(currentReport.projectPath);
     renderReport();
+    refreshUsage();
   } catch (error) {
     alert(error.message || 'Não foi possível analisar o projeto.');
   } finally {
@@ -1773,14 +1775,17 @@ function ensureSettingsOverlay() {
     }
     const accountAction = event.target.closest('[data-account-action]');
     if (!accountAction) return;
-    if (accountAction.dataset.accountAction === 'upgrade') {
+    const action = accountAction.dataset.accountAction;
+    if (action === 'upgrade') {
       closeVuppoSettings();
-      $('#plans-modal')?.classList.remove('hidden');
-    } else if (accountAction.dataset.accountAction === 'logout') {
+      openPlansModal();
+    } else if (action === 'logout') {
       accountAction.disabled = true;
       window.vuppo.logout()
         .then(() => window.location.reload())
         .catch(() => { accountAction.disabled = false; });
+    } else {
+      handleSettingsGithubAction(action, accountAction);
     }
   });
   searchInput.addEventListener('input', () => renderSettingsContent());
@@ -1818,7 +1823,7 @@ function renderSettingsContent() {
     : activeCategory.id === 'account'
       ? renderAccountSection()
       : renderSettingsSection(activeCategory, false);
-  if (activeCategory.id === 'account') fillSettingsAccount();
+  if (activeCategory.id === 'account') { fillSettingsAccount(); fillSettingsGithub(); fillSettingsCredits(); }
 }
 
 function renderSettingsSection(category, fromSearch) {
@@ -1827,7 +1832,100 @@ function renderSettingsSection(category, fromSearch) {
 }
 
 function renderAccountSection() {
-  return `<section class="settings-section" data-settings-section="account"><p class="settings-breadcrumb">Configurações › Conta</p><h3 class="settings-section-title">Conta</h3><div class="settings-account" id="settings-account-card"><div class="settings-account-head"><div class="settings-account-avatar" id="settings-account-avatar">V</div><div class="settings-account-info"><strong id="settings-account-name">Conta local Vuppo</strong><span id="settings-account-email">Carregando…</span></div><span class="settings-account-plan">Free Plan</span></div></div><div class="settings-row"><div class="settings-row-text"><strong>Plano atual</strong><span>Você está no Free Plan. Faça upgrade para Pro ou Team quando quiser.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-primary" data-account-action="upgrade">Fazer upgrade</button></div></div><div class="settings-row"><div class="settings-row-text"><strong>Provedor de acesso</strong><span id="settings-account-provider">…</span></div></div><div class="settings-row"><div class="settings-row-text"><strong>Sair da conta</strong><span>Encerra a sessão atual e volta para a tela de login.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-danger" data-account-action="logout">Sair</button></div></div></section>`;
+  return `<section class="settings-section" data-settings-section="account"><p class="settings-breadcrumb">Configurações › Conta</p><h3 class="settings-section-title">Conta</h3><div class="settings-account" id="settings-account-card"><div class="settings-account-head"><div class="settings-account-avatar" id="settings-account-avatar">V</div><div class="settings-account-info"><strong id="settings-account-name">Conta local Vuppo</strong><span id="settings-account-email">Carregando…</span></div><span class="settings-account-plan" id="settings-account-plan">Free Plan</span></div></div><div class="settings-account settings-connection" id="settings-github-card"><div class="settings-connection-head"><span class="settings-connection-icon codicon codicon-github" aria-hidden="true"></span><div class="settings-connection-info"><strong>GitHub</strong><span id="settings-github-status">Verificando conexão…</span></div><span class="settings-connection-pill" id="settings-github-pill">Verificando…</span></div><p class="settings-inline-hint" id="settings-github-hint" hidden></p><div class="settings-connection-actions"><button type="button" class="settings-action settings-action-primary" id="settings-github-connect" data-account-action="github-connect">Conectar GitHub</button><button type="button" class="settings-action" id="settings-github-refresh" data-account-action="github-refresh">Verificar novamente</button><button type="button" class="settings-action" id="settings-github-copy" data-account-action="github-copy" hidden>Copiar código</button><button type="button" class="settings-action settings-action-danger" id="settings-github-disconnect" data-account-action="github-disconnect" hidden>Desconectar</button></div></div><div class="settings-account settings-credits" id="settings-credits-card"><div class="settings-credits-head"><div class="settings-connection-info"><strong>Créditos do plano</strong><span id="settings-credits-plan">Free Plan · 500 créditos a cada ciclo</span></div><span class="settings-account-plan" id="settings-credits-badge">Free Plan</span></div><div class="credits-bar" id="settings-credits-bar" role="progressbar" aria-label="Créditos usados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="credits-bar-fill" id="settings-credits-fill"></span></div><div class="settings-credits-stats"><span><b id="settings-credits-used">0</b> usados de <b id="settings-credits-limit">500</b></span><span><b id="settings-credits-remaining">500</b> restantes</span><span id="settings-credits-percent">0%</span></div><p class="settings-inline-hint" id="settings-credits-meta">Carregando consumo…</p><div class="settings-credits-history" id="settings-credits-history"></div></div><div class="settings-row"><div class="settings-row-text"><strong>Plano atual</strong><span id="settings-plan-summary">Você está no Free Plan. Faça upgrade para Pro ou Team quando quiser.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-primary" data-account-action="upgrade">Fazer upgrade</button></div></div><div class="settings-row"><div class="settings-row-text"><strong>Provedor de acesso</strong><span id="settings-account-provider">…</span></div></div><div class="settings-row"><div class="settings-row-text"><strong>Sair da conta</strong><span>Encerra a sessão atual e volta para a tela de login.</span></div><div class="settings-row-control"><button type="button" class="settings-action settings-action-danger" data-account-action="logout">Sair</button></div></div></section>`;
+}
+
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+// A renovação do ciclo é uma data de calendário (UTC), por isso não sofre conversão de fuso.
+const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+
+function formatCredits(value) {
+  return (Number(value) || 0).toLocaleString('pt-BR');
+}
+
+function formatShortDate(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '--' : UTC_DATE_FORMATTER.format(date);
+}
+
+function formatDateTime(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '--' : DATE_TIME_FORMATTER.format(date);
+}
+
+let usageCache = null;
+let usageRequestId = 0;
+
+async function refreshUsage() {
+  const requestId = ++usageRequestId;
+  let usage = null;
+  try { usage = (await window.vuppo.getUsage?.()) || null; } catch { usage = null; }
+  if (requestId !== usageRequestId) return usageCache;
+  if (usage) usageCache = usage;
+  applyUsageToUI(usageCache);
+  return usageCache;
+}
+
+function creditsMeta(usage) {
+  if (!usage.signedIn) return 'Entre na sua conta Vuppo para acompanhar o consumo de créditos do seu plano.';
+  const renewal = formatShortDate(usage.renewsAt);
+  if (usage.remaining === 0 && usage.used >= usage.limit) return `Créditos do ciclo esgotados${usage.overage ? ` (${formatCredits(usage.overage)} acima do limite)` : ''}. Renova em ${renewal}.`;
+  return `Ciclo de ${usage.cycleLabel} · ${formatCredits(usage.remaining)} créditos restantes · renova em ${renewal}.`;
+}
+
+function applyUsageToUI(usage) {
+  if (!usage) return;
+  const homeLabel = $('#vuppo-home-plan-label');
+  if (homeLabel) homeLabel.textContent = usage.planLabel;
+  const planBadge = $('#settings-account-plan');
+  if (planBadge) planBadge.textContent = usage.planLabel;
+  const creditsBadge = $('#settings-credits-badge');
+  if (creditsBadge) creditsBadge.textContent = usage.planLabel;
+  const creditsPlan = $('#settings-credits-plan');
+  if (creditsPlan) creditsPlan.textContent = `${usage.planLabel} · ${formatCredits(usage.limit)} créditos a cada ciclo`;
+  const used = $('#settings-credits-used');
+  if (used) used.textContent = formatCredits(usage.used);
+  const limit = $('#settings-credits-limit');
+  if (limit) limit.textContent = formatCredits(usage.limit);
+  const remaining = $('#settings-credits-remaining');
+  if (remaining) remaining.textContent = formatCredits(usage.remaining);
+  const percent = $('#settings-credits-percent');
+  if (percent) percent.textContent = `${usage.percent}%`;
+  const fill = $('#settings-credits-fill');
+  if (fill) fill.style.width = `${usage.percent}%`;
+  const bar = $('#settings-credits-bar');
+  if (bar) {
+    bar.setAttribute('aria-valuenow', String(Math.round(usage.percent)));
+    bar.classList.toggle('is-warning', usage.percent >= 70 && usage.percent < 100);
+    bar.classList.toggle('is-full', usage.percent >= 100);
+  }
+  const meta = $('#settings-credits-meta');
+  if (meta) {
+    meta.classList.toggle('is-error', Boolean(usage.signedIn && usage.remaining === 0 && usage.used > 0));
+    meta.textContent = creditsMeta(usage);
+  }
+  const history = $('#settings-credits-history');
+  if (history) {
+    history.innerHTML = usage.history.length
+      ? `<span class="settings-credits-history-title">Últimas análises</span>${usage.history.slice(0, 5).map((entry) => `<div class="settings-credits-history-item"><span>${escapeHtml(entry.label)}</span><span>${formatCredits(entry.credits)} créditos · ${formatDateTime(entry.at)}</span></div>`).join('')}`
+      : '';
+  }
+  const summary = $('#settings-plan-summary');
+  if (summary) {
+    const upgrades = (usage.plans || []).filter((plan) => plan.id !== usage.plan);
+    summary.textContent = usage.signedIn
+      ? `Você está no ${usage.planLabel}, com ${formatCredits(usage.limit)} créditos por ciclo.${upgrades.length ? ` Faça upgrade para ${upgrades.map((plan) => `${plan.name} (${formatCredits(plan.credits)} créditos)`).join(' ou ')}.` : ''}`
+      : 'Entre na sua conta Vuppo para acompanhar o consumo de créditos do seu plano.';
+  }
+  fillPlansModal(usage);
+}
+
+function fillSettingsCredits() {
+  if (!$('#settings-credits-card')) return;
+  if (usageCache) applyUsageToUI(usageCache);
+  else refreshUsage();
 }
 
 function fillSettingsAccount() {
@@ -1849,6 +1947,169 @@ function fillSettingsAccount() {
     if (avatar) avatar.textContent = (String(account.name || account.email || '?').trim().charAt(0) || 'V').toUpperCase();
     if (provider) provider.textContent = ({ email: 'E-mail e senha', google: 'Google', github: 'GitHub', apple: 'Apple' })[account.provider] || 'E-mail e senha';
   }).catch(() => {});
+  refreshUsage();
+}
+
+let githubStatusCache = null;
+let githubPollTimer = null;
+let githubPollStopAt = 0;
+
+async function fillSettingsGithub() {
+  if (!$('#settings-github-card')) return;
+  try {
+    githubStatusCache = (await window.vuppo.githubStatus?.()) || null;
+  } catch (error) {
+    githubStatusCache = { connected: false, error: (error && error.message) || 'Não foi possível verificar a conexão com o GitHub.' };
+  }
+  renderGithubStatus(githubStatusCache);
+}
+
+function setGithubHint(message, isError) {
+  const hint = $('#settings-github-hint');
+  if (!hint) return;
+  hint.textContent = message || '';
+  hint.hidden = !message;
+  hint.classList.toggle('is-error', Boolean(isError));
+}
+
+function githubHint(status) {
+  if (!status) return '';
+  if (status.error) return status.error;
+  if (status.oauthConfigured) return 'A conexão abre o navegador e pede um código de autorização do GitHub.';
+  if (status.cliAvailable) return 'A conexão usa a GitHub CLI (gh) instalada nesta máquina.';
+  return 'Instale a GitHub CLI (gh) ou defina VUPPO_GITHUB_CLIENT_ID para conectar pelo OAuth do GitHub.';
+}
+
+function renderGithubStatus(status) {
+  const statusText = $('#settings-github-status');
+  if (!statusText) return;
+  const pill = $('#settings-github-pill');
+  const connect = $('#settings-github-connect');
+  const disconnect = $('#settings-github-disconnect');
+  const copy = $('#settings-github-copy');
+  const pending = status && status.pending && status.pending.status === 'pending' ? status.pending : null;
+  if (status && status.connected) {
+    statusText.textContent = `Conectado como @${status.login}${status.source === 'cli' ? ' · GitHub CLI' : ''}`;
+    if (pill) { pill.textContent = 'CONECTADO'; pill.className = 'settings-connection-pill is-connected'; }
+  } else if (pending) {
+    statusText.textContent = `Aguardando autorização · código ${pending.userCode}`;
+    if (pill) { pill.textContent = 'AGUARDANDO'; pill.className = 'settings-connection-pill is-pending'; }
+  } else {
+    statusText.textContent = 'Nenhuma conta do GitHub conectada.';
+    if (pill) { pill.textContent = 'NÃO CONECTADO'; pill.className = 'settings-connection-pill'; }
+  }
+  if (connect) { connect.hidden = Boolean((status && status.connected) || pending); connect.disabled = false; }
+  if (disconnect) disconnect.hidden = !(status && status.connected);
+  if (copy) copy.hidden = !pending;
+  setGithubHint(pending ? `Informe o código ${pending.userCode} em ${pending.verificationUri} para autorizar a conexão.` : githubHint(status), Boolean(status && status.error));
+  if (pending) { if (!githubPollTimer) startGithubPolling(); }
+  else stopGithubPolling();
+}
+
+function startGithubPolling() {
+  stopGithubPolling();
+  githubPollStopAt = Date.now() + 15 * 60 * 1000;
+  githubPollTimer = setInterval(async () => {
+    if (Date.now() > githubPollStopAt) { stopGithubPolling(); return; }
+    await fillSettingsGithub();
+    if (!githubStatusCache || githubStatusCache.connected || !githubStatusCache.pending || githubStatusCache.pending.status !== 'pending') stopGithubPolling();
+  }, 3000);
+}
+
+function stopGithubPolling() {
+  if (githubPollTimer) clearInterval(githubPollTimer);
+  githubPollTimer = null;
+}
+
+function copyText(value) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(value); return true; }
+  } catch { /* clipboard indisponível */ }
+  try {
+    const field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', 'readonly');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
+async function handleSettingsGithubAction(action, button) {
+  if (action === 'github-copy') {
+    const code = githubStatusCache && githubStatusCache.pending ? githubStatusCache.pending.userCode : '';
+    if (code && copyText(code)) setGithubHint(`Código ${code} copiado para a área de transferência.`);
+    else if (code) setGithubHint(`Copie o código ${code} e informe na página do GitHub.`);
+    return;
+  }
+  if (action === 'github-refresh') {
+    button.disabled = true;
+    await fillSettingsGithub();
+    button.disabled = false;
+    return;
+  }
+  if (action === 'github-disconnect') {
+    button.disabled = true;
+    stopGithubPolling();
+    try {
+      await window.vuppo.githubDisconnect();
+      await fillSettingsGithub();
+      setGithubHint('Conta do GitHub desconectada.');
+    } catch (error) {
+      setGithubHint((error && error.message) || 'Não foi possível desconectar a conta do GitHub.', true);
+    } finally {
+      button.disabled = false;
+    }
+    return;
+  }
+  button.disabled = true;
+  setGithubHint('Iniciando conexão com o GitHub…');
+  try {
+    const result = await window.vuppo.githubConnect();
+    if (result && result.status === 'pending') {
+      githubStatusCache = { ...(githubStatusCache || {}), connected: false, pending: { userCode: result.userCode, verificationUri: result.verificationUri, status: 'pending', error: '' } };
+      renderGithubStatus(githubStatusCache);
+    } else {
+      await fillSettingsGithub();
+    }
+  } catch (error) {
+    setGithubHint((error && error.message) || 'Não foi possível conectar ao GitHub.', true);
+    button.disabled = false;
+  }
+}
+
+function openPlansModal() {
+  const modal = $('#plans-modal');
+  if (!modal) return;
+  if (usageCache) fillPlansModal(usageCache);
+  else refreshUsage();
+  modal.classList.remove('hidden');
+}
+
+function fillPlansModal(usage) {
+  const list = $('#plans-list');
+  if (!list || !usage || !Array.isArray(usage.plans) || !usage.plans.length) return;
+  list.innerHTML = usage.plans.map((plan) => {
+    const featured = plan.id === 'pro';
+    const current = plan.id === usage.plan;
+    return `<article class="plan-card ${featured ? 'plan-featured' : ''}" data-plan="${plan.id}">${featured ? '<span class="plan-badge">RECOMENDADO</span>' : ''}<h4>${escapeHtml(plan.name)}</h4><p>${escapeHtml(plan.description)}</p><strong>$${plan.price} <small>/ mês</small></strong><span class="plan-credits">${formatCredits(plan.credits)} créditos por ciclo</span>${current ? '<button class="plan-current" disabled>Plano atual</button>' : `<button class="plan-select" data-plan-select="${plan.id}">Escolher ${escapeHtml(plan.name)}</button>`}</article>`;
+  }).join('');
+  list.querySelectorAll('[data-plan-select]').forEach((button) => button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await window.vuppo.setPlan(button.dataset.planSelect);
+      await refreshUsage();
+    } catch (error) {
+      button.disabled = false;
+      alert((error && error.message) || 'Não foi possível trocar de plano.');
+    }
+  }));
 }
 
 function openVuppoSettings(category) {
@@ -2476,20 +2737,17 @@ $('#cancel-clone').addEventListener('click', () => setCloneModal(false));
 $('#repo-url').addEventListener('keydown', (event) => { if (event.key === 'Enter') cloneRepo(); });
 $('#settings-button')?.addEventListener('click', () => openVuppoSettings());
 const homePlan = $('.vuppo-home-plan');
-if (homePlan && !$('#upgrade-button')) homePlan.innerHTML = 'Free Plan <span>·</span> <button type="button" id="upgrade-button">Upgrade</button>';
+if (homePlan && !$('#upgrade-button')) homePlan.innerHTML = '<span id="vuppo-home-plan-label">Free Plan</span> <span>·</span> <button type="button" id="upgrade-button">Upgrade</button>';
 let plansModal = $('#plans-modal');
 if (!plansModal) {
-  $('.dashboard').insertAdjacentHTML('beforeend', '<div class="plans-modal hidden" id="plans-modal" role="dialog" aria-modal="true" aria-labelledby="plans-title"><div class="plans-dialog"><div class="clone-dialog-heading"><div><p class="dashboard-kicker">VUPPO PLANS</p><h3 id="plans-title">Choose your plan</h3></div><button class="modal-close" id="close-plans" aria-label="Fechar">&#10005;</button></div><div class="plans-list"><article class="plan-card"><h4>Free</h4><p>Para começar</p><strong>$0 <small>/ mês</small></strong><button class="plan-current" disabled>Plano atual</button></article><article class="plan-card plan-featured"><span class="plan-badge">RECOMENDADO</span><h4>Pro</h4><p>Para projetos em crescimento</p><strong>$12 <small>/ mês</small></strong><button class="plan-select">Escolher Pro</button></article><article class="plan-card"><h4>Team</h4><p>Para equipes de segurança</p><strong>$29 <small>/ mês</small></strong><button class="plan-select">Escolher Team</button></article></div></div></div>');
+  $('.dashboard').insertAdjacentHTML('beforeend', '<div class="plans-modal hidden" id="plans-modal" role="dialog" aria-modal="true" aria-labelledby="plans-title"><div class="plans-dialog"><div class="clone-dialog-heading"><div><p class="dashboard-kicker">VUPPO PLANS</p><h3 id="plans-title">Choose your plan</h3></div><button class="modal-close" id="close-plans" aria-label="Fechar">&#10005;</button></div><div class="plans-list" id="plans-list"></div><p class="plans-note">A cobrança será habilitada em breve; a troca de plano já ajusta os créditos do ciclo nesta versão.</p></div></div>');
   plansModal = $('#plans-modal');
 }
 const upgradeButton = $('#upgrade-button');
 const closePlansButton = $('#close-plans');
-if (upgradeButton && plansModal) upgradeButton.addEventListener('click', () => plansModal.classList.remove('hidden'));
+if (upgradeButton && plansModal) upgradeButton.addEventListener('click', () => openPlansModal());
 if (closePlansButton && plansModal) closePlansButton.addEventListener('click', () => plansModal.classList.add('hidden'));
-document.querySelectorAll('.plan-select').forEach((button) => button.addEventListener('click', () => {
-  button.textContent = 'Em breve';
-  button.disabled = true;
-}));
+refreshUsage();
 $('#logout-button').addEventListener('click', async () => { await window.vuppo.logout(); window.location.reload(); });
 $('#export-button').addEventListener('click', () => { const blob = new Blob([JSON.stringify(currentReport, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `vuppo-${currentReport.projectName}.json`; link.click(); URL.revokeObjectURL(link.href); });
 document.querySelectorAll('[data-provider]').forEach((button) => button.addEventListener('click', async (event) => {

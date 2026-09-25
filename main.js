@@ -20,7 +20,193 @@ function getTerminalCommand() {
   return { command, args: ['-i'] };
 }
 
-function createWindow() {
+const GITHUB_CLIENT_ID = process.env.VUPPO_GITHUB_CLIENT_ID || '';
+const GITHUB_SCOPES = process.env.VUPPO_GITHUB_SCOPES || 'read:user repo';
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const GITHUB_USER_URL = 'https://api.github.com/user';
+const GITHUB_DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
+const GITHUB_CLI_TIMEOUT = 5 * 60 * 1000;
+// Cada arquivo analisado consome 1 crédito do plano do usuário.
+const CREDITS_PER_ANALYZED_FILE = 1;
+const githubConnections = new Map();
+
+function runProcess(command, args, options = {}) {
+  return new Promise((resolve) => {
+    execFile(command, args, { windowsHide: true, maxBuffer: 4 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
+      resolve({ error, stdout: stdout || '', stderr: stderr || '' });
+    });
+  });
+}
+
+function githubFetch(url, { method = 'GET', token, body } = {}) {
+  if (typeof fetch !== 'function') return Promise.reject(new Error('Esta versão do Electron não suporta requisições externas.'));
+  return fetch(url, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Vuppo',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  }).then(async (response) => {
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok && !payload.error) throw new Error(payload.message || `O GitHub respondeu com status ${response.status}.`);
+    return payload;
+  });
+}
+
+async function fetchGithubUser(token) {
+  const user = await githubFetch(GITHUB_USER_URL, { token });
+  if (!user || !user.login) throw new Error('Não foi possível ler o perfil autorizado no GitHub.');
+  return { login: user.login, avatarUrl: user.avatar_url || '' };
+}
+
+async function detectGithubCli() {
+  const result = await runProcess('gh', ['api', 'user']);
+  if (result.error) {
+    const missing = /ENOENT/.test(result.error.message || '');
+    return { available: !missing, connected: false, login: '', avatarUrl: '' };
+  }
+  try {
+    const user = JSON.parse(result.stdout);
+    return { available: true, connected: Boolean(user && user.login), login: (user && user.login) || '', avatarUrl: (user && user.avatar_url) || '' };
+  } catch {
+    return { available: true, connected: false, login: '', avatarUrl: '' };
+  }
+}
+
+function loginWithGithubCli() {
+  return new Promise((resolve, reject) => {
+    const child = spawn('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web'], { windowsHide: true });
+    let stderr = '';
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Tempo esgotado aguardando a autorização no GitHub.')); }, GITHUB_CLI_TIMEOUT);
+    child.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error.code === 'ENOENT' ? new Error('A GitHub CLI (gh) não está instalada nesta máquina.') : error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(true);
+      else reject(new Error(stderr.trim() || 'Não foi possível autenticar pela GitHub CLI.'));
+    });
+    // A GitHub CLI pede um Enter para abrir o navegador; enviamos automaticamente.
+    setTimeout(() => { try { child.stdin.write('\n'); child.stdin.end(); } catch { /* stdin indisponível */ } }, 1500);
+  });
+}
+
+function pendingGithubConnection(auth) {
+  const session = auth.getSession();
+  if (!session) return null;
+  const connection = githubConnections.get(session.id);
+  if (!connection) return null;
+  if (connection.status === 'pending' && Date.now() > connection.expiresAt) {
+    connection.status = 'expired';
+    connection.error = 'O código de conexão expirou. Tente novamente.';
+  }
+  return connection;
+}
+
+function pendingGithubPayload(connection) {
+  if (!connection) return null;
+  return {
+    userCode: connection.userCode,
+    verificationUri: connection.verificationUri,
+    status: connection.status,
+    error: connection.error,
+    expiresAt: connection.expiresAt ? new Date(connection.expiresAt).toISOString() : null,
+  };
+}
+
+async function githubStatus(auth) {
+  const pending = pendingGithubConnection(auth);
+  const linked = auth.getGithub();
+  const base = { oauthConfigured: Boolean(GITHUB_CLIENT_ID), pending: pendingGithubPayload(pending) };
+  if (linked.connected) return { ...base, connected: true, login: linked.login, avatarUrl: linked.avatarUrl, source: linked.source, connectedAt: linked.connectedAt };
+  const cli = await detectGithubCli();
+  if (cli.connected) return { ...base, connected: true, login: cli.login, avatarUrl: cli.avatarUrl, source: 'cli', connectedAt: null, cliAvailable: true };
+  return { ...base, connected: false, login: '', avatarUrl: '', source: null, connectedAt: null, cliAvailable: cli.available };
+}
+
+async function pollGithubDeviceFlow(auth, accountId, connection) {
+  while (connection.status === 'pending') {
+    if (Date.now() > connection.expiresAt) {
+      connection.status = 'expired';
+      connection.error = 'O código de conexão expirou. Tente novamente.';
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, connection.interval * 1000));
+    if (connection.status !== 'pending') return;
+    let payload;
+    try {
+      payload = await githubFetch(GITHUB_ACCESS_TOKEN_URL, { method: 'POST', body: { client_id: GITHUB_CLIENT_ID, device_code: connection.deviceCode, grant_type: GITHUB_DEVICE_GRANT } });
+    } catch {
+      continue; // falha de rede: tenta novamente no próximo intervalo
+    }
+    if (payload.access_token) {
+      try {
+        const user = await fetchGithubUser(payload.access_token);
+        const session = auth.getSession();
+        if (!session || session.id !== accountId) throw new Error('A sessão da Vuppo mudou durante a conexão.');
+        auth.connectGithub({ login: user.login, avatarUrl: user.avatarUrl, source: 'oauth', token: payload.access_token });
+        connection.status = 'connected';
+        connection.error = '';
+      } catch (error) {
+        connection.status = 'error';
+        connection.error = error.message || 'Não foi possível concluir a conexão com o GitHub.';
+      }
+      return;
+    }
+    if (payload.error === 'authorization_pending') continue;
+    if (payload.error === 'slow_down') { connection.interval += 5; continue; }
+    if (payload.error === 'expired_token') { connection.status = 'expired'; connection.error = 'O código de conexão expirou. Tente novamente.'; return; }
+    if (payload.error === 'access_denied') { connection.status = 'denied'; connection.error = 'Autorização cancelada no GitHub.'; return; }
+    connection.status = 'error';
+    connection.error = payload.error_description || 'Não foi possível concluir a conexão com o GitHub.';
+    return;
+  }
+}
+
+async function startGithubDeviceFlow(auth, accountId) {
+  const payload = await githubFetch(GITHUB_DEVICE_CODE_URL, { method: 'POST', body: { client_id: GITHUB_CLIENT_ID, scope: GITHUB_SCOPES } });
+  if (!payload.device_code) throw new Error(payload.error_description || 'O GitHub recusou a solicitação de conexão.');
+  const connection = {
+    userCode: payload.user_code || '',
+    verificationUri: payload.verification_uri || 'https://github.com/login/device',
+    deviceCode: payload.device_code,
+    interval: Math.max(5, Number(payload.interval) || 5),
+    expiresAt: Date.now() + (Number(payload.expires_in) || 900) * 1000,
+    status: 'pending',
+    error: '',
+  };
+  githubConnections.set(accountId, connection);
+  shell.openExternal(connection.verificationUri).catch(() => {});
+  pollGithubDeviceFlow(auth, accountId, connection);
+  return { status: 'pending', userCode: connection.userCode, verificationUri: connection.verificationUri, interval: connection.interval, expiresIn: Math.round((connection.expiresAt - Date.now()) / 1000) };
+}
+
+async function connectGithubAccount(auth) {
+  const session = auth.getSession();
+  if (!session) throw new Error('Entre na sua conta Vuppo para conectar o GitHub.');
+  if (GITHUB_CLIENT_ID) return startGithubDeviceFlow(auth, session.id);
+  const cli = await detectGithubCli();
+  if (cli.connected) return { status: 'connected', account: auth.connectGithub({ login: cli.login, avatarUrl: cli.avatarUrl, source: 'cli' }) };
+  if (!cli.available) throw new Error('Instale a GitHub CLI (gh) ou defina VUPPO_GITHUB_CLIENT_ID para conectar pelo OAuth do GitHub.');
+  await loginWithGithubCli();
+  const authenticated = await detectGithubCli();
+  if (!authenticated.connected) throw new Error('A GitHub CLI não retornou uma sessão autenticada.');
+  return { status: 'connected', account: auth.connectGithub({ login: authenticated.login, avatarUrl: authenticated.avatarUrl, source: 'cli' }) };
+}
+
+function disconnectGithubAccount(auth) {
+  const session = auth.getSession();
+  if (session) githubConnections.delete(session.id);
+  return auth.disconnectGithub();
+}
+
+async function createWindow() {
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -54,6 +240,11 @@ app.whenReady().then(() => {
   ipcMain.handle('auth-login', (_event, credentials) => auth.login(credentials));
   ipcMain.handle('auth-social-login', (_event, provider) => auth.socialLogin(provider));
   ipcMain.handle('auth-logout', () => auth.logout());
+  ipcMain.handle('usage-get', () => auth.getUsage());
+  ipcMain.handle('plan-set', (_event, planId) => auth.setPlan(planId));
+  ipcMain.handle('github-status', () => githubStatus(auth));
+  ipcMain.handle('github-connect', () => connectGithubAccount(auth));
+  ipcMain.handle('github-disconnect', () => disconnectGithubAccount(auth));
   ipcMain.handle('choose-project', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
     return result.canceled ? null : result.filePaths[0];
@@ -137,7 +328,14 @@ app.whenReady().then(() => {
     return true;
   });
 
-  ipcMain.handle('scan-project', async (_event, projectPath) => scanProject(projectPath));
+  ipcMain.handle('scan-project', async (_event, projectPath) => {
+    const report = await scanProject(projectPath);
+    try {
+      const analyzed = Math.max(1, Number(report.analyzedFiles) || 0);
+      auth.recordUsage({ credits: CREDITS_PER_ANALYZED_FILE * analyzed, label: report.projectName, filesScanned: report.filesScanned });
+    } catch { /* a análise nunca deve falhar por causa da contabilização de créditos */ }
+    return report;
+  });
   ipcMain.handle('material-icon-catalog', async () => JSON.parse(await fs.promises.readFile(path.join(__dirname, 'assets', 'material-icons.json'), 'utf8')));
   ipcMain.handle('terminal-create', (event, { cwd }) => {
     if (!cwd || !fs.existsSync(cwd)) throw new Error('Diretório do terminal não encontrado.');
