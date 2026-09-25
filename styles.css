@@ -378,7 +378,7 @@ button { cursor:pointer; }
 .workspace-feature-panel.preview-panel:not(.hidden) .preview-browser-bar { display:grid; grid-template-columns:205px minmax(0,1fr) 38px 38px 38px; }
 .workspace.preview-open .editor-panel-label { display:none; }
 .workspace-feature-panel[data-feature-panel="terminal"] { min-height:220px; flex-direction:column; align-items:stretch; gap:0; padding:0; background:#141414; border-color:#2b2b2b; }
-.workspace-feature-panel[data-feature-panel="terminal"].is-maximized { top:0; right:0; bottom:24px; left:0; z-index:6; min-height:0; }
+.workspace-feature-panel[data-feature-panel="terminal"].is-maximized { top:0; right:0; bottom:24px; left:0; z-index:7; min-height:0; }
 .workspace-feature-panel[data-feature-panel="terminal"] .terminal-heading { background:#141414; border-bottom:1px solid #2b2b2b; }
 .terminal-heading { position:absolute; z-index:1; top:0; right:0; left:0; width:100%; height:46px; display:flex; flex-wrap:nowrap; align-items:center; justify-content:flex-start; min-width:0; padding-right:108px; }
 .terminal-tabs { position:absolute; top:0; left:0; display:flex; flex:0 1 auto; align-items:stretch; gap:2px; min-width:0; max-width:calc(100% - 108px); margin-left:0; overflow:auto; }
@@ -518,6 +518,13 @@ body.vuppo-hide-minimap .vuppo-monaco .minimap { display:none !important; }
 .vuppo-monaco .suggest-widget,
 .vuppo-monaco .monaco-hover,
 .vuppo-monaco .parameter-hints-widget { z-index:70; }
+
+/* O minimap nativo do Monaco é posicionado com z-index:5 dentro do editor.
+   Os painéis de recurso (Chat/Terminal/Preview) são sobreposições do workspace
+   e precisam ser pintados acima dele — com o z-index:4 original o minimap
+   invadia o painel aberto (sobreposição visual e roubo de cliques). O terminal
+   maximizado permanece acima do Chat (z-index:7 na regra .is-maximized). */
+.workspace-feature-panel { z-index:6; }
 
 /* ===== Configurações (estilo VS Code) ===== */
 :root { --vuppo-code-font-size:12px; --vuppo-code-tab-size:2; --vuppo-minimap-width:120px; --vuppo-chat-font-size:11px; }
