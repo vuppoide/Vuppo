@@ -240,7 +240,7 @@ function renderReport() {
     workspace.innerHTML = `<header class="workspace-topbar"><div class="workspace-brand"><span class="workspace-logo">V</span><strong>Vuppo</strong><span class="workspace-separator">/</span><span>${escapeHtml(currentReport.projectName)}</span></div><nav class="workspace-top-actions" aria-label="Ações do editor"><button class="top-action-button active" type="button" title="Preview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8M8 12h5M8 16h3"/></svg><span>Preview</span></button><button class="top-action-button" type="button" title="Terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg><span>Terminal</span></button><button class="top-action-button" type="button" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.3-.64L4 20l1.64-3.55A7.4 7.4 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/></svg><span>Chat</span></button><button class="profile-button" type="button" title="Perfil" aria-label="Perfil"><span>U</span></button></nav></header><div class="workspace-body"><nav class="workspace-activity" aria-label="Navegação do projeto"><button class="activity-button active" title="Explorador de arquivos" aria-label="Explorador de arquivos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"/><path d="M3 10h18"/></svg></button><button class="activity-button" title="Git" aria-label="Git"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M8 5h4a6 6 0 0 1 6 6M16 12h-4"/></svg></button><button class="activity-button" title="Extensões" aria-label="Extensões"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4h4v2H3v4a2 2 0 0 0 2 2h4v-4h2v4h4a2 2 0 0 0 2-2v-4h-4V9h4V5a2 2 0 0 0-2-2h-4v4H9V3Z"/></svg></button><button class="activity-button" title="Security Problems" aria-label="Security Problems"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 21 7v5c0 4.8-3.2 7.7-9 9-5.8-1.3-9-4.2-9-9V7l9-4Z"/><path d="M12 8v4M12 16h.01"/></svg></button><span></span><button class="activity-button" id="workspace-settings" title="Configurações" aria-label="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button></nav>
   </div></div>`;
   workspace.querySelector('.workspace-body').insertAdjacentHTML('beforeend', `<aside class="workspace-sidebar"><div class="sidebar-title">EXPLORER <span>${currentReport.filesScanned}</span></div><section class="explorer-open-editors"><div class="explorer-section-heading">OPEN EDITORS</div><button class="open-editor-item" type="button"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</button></section><div class="file-tree"><div class="tree-folder">${escapeHtml(currentReport.projectName)}</div>${(files.length ? files : [{ file: 'Nenhum arquivo encontrado' }]).map((file) => `<button class="tree-file" data-file="${escapeHtml(file.file)}"><span class="file-dot"></span>${escapeHtml(file.file)}</button>`).join('')}</div><div class="sidebar-bottom"><span>ANALISE</span><strong>${currentReport.findings.length} achados</strong><small>${currentReport.durationMs} ms · ${currentReport.filesScanned} arquivos</small></div></aside><main class="workspace-editor"><div class="editor-tabs"><span class="editor-tab active"><i></i>${escapeHtml(firstFinding ? firstFinding.file.split(/[\\/]/).pop() : (files[0]?.file || 'README.md'))}</span></div><div class="editor-content"><div class="line-numbers">${Array.from({ length: Math.max(12, firstFinding ? firstFinding.line + 4 : 12) }, (_, index) => `<span>${index + 1}</span>`).join('')}</div><pre class="code-preview"><code>${escapeHtml(firstFinding ? firstFinding.excerpt : (files[0]?.content || '// Nenhum arquivo encontrado.'))}</code></pre></div><div class="editor-panel-label">PROBLEMS <span>${currentReport.findings.length}</span></div></main><aside class="security-panel"><div class="security-heading"><div><span class="panel-eyebrow">VUPPO SECURITY</span><h2>Security Problems</h2></div><span class="finding-total">${currentReport.findings.length}</span></div><div class="severity-summary"><span><b class="severity-critical">${counts.critical || 0}</b> critical</span><span><b class="severity-high">${counts.high || 0}</b> high</span><span><b class="severity-medium">${counts.medium || 0}</b> medium</span></div><div class="workspace-findings">${currentReport.findings.length ? currentReport.findings.map((finding, index) => `<button class="workspace-finding ${index === 0 ? 'selected' : ''}" data-finding-index="${index}"><span class="finding-severity ${finding.severity}"></span><span><strong>${escapeHtml(finding.title)}</strong><small>${escapeHtml(finding.file)}:${finding.line}</small></span></button>`).join('') : '<div class="workspace-empty-state">Nenhum risco encontrado pelas regras atuais.</div>'}</div></aside><footer class="workspace-statusbar"><span>main</span><span>${escapeHtml(currentReport.projectPath)}</span><span>${currentReport.scannedAt.slice(0, 10)} · ${currentReport.filesScanned} arquivos</span></footer>`);
-  workspace.querySelector('.editor-tabs').innerHTML = '';
+  workspace.querySelector('.editor-tabs').innerHTML = '<div class="editor-tabs-actions hidden"><button class="editor-tabs-menu-button" type="button" title="Mais ações" aria-label="Mais ações">...</button><div class="editor-tabs-menu hidden"><button type="button" data-editor-action="save">Salvar</button><button type="button" data-editor-action="close">Fechar editor</button><button type="button" data-editor-action="close-all">Fechar todos</button></div></div>';
   activeMinimapRefresh = null;
   workspace.querySelector('.editor-content').innerHTML = '<div class="editor-empty"><img src="vuppo-icon.png" alt="Vuppo" /><span>Abra um arquivo para começar</span></div>';
   const fileTree = workspace.querySelector('.file-tree');
@@ -383,28 +383,46 @@ function setupWorkspaceControls(workspace) {
   if (openEditor) openEditor.innerHTML = `<i></i><span class="open-editor-name">${escapeHtml(openEditorName)}</span><span class="open-editor-close" title="Fechar editor" aria-label="Fechar editor">×</span>`;
   if (editorTab) editorTab.innerHTML = `<span class="editor-tab-icon"></span><span class="editor-tab-name">${escapeHtml(editorTab.textContent.trim())}</span><button class="editor-tab-close" type="button" title="Fechar editor" aria-label="Fechar editor">×</button>`;
   const editorTabs = workspace.querySelector('.editor-tabs');
-  editorTabs?.insertAdjacentHTML('beforeend', '<div class="editor-tabs-actions"><button class="editor-tabs-menu-button" type="button" title="Mais ações" aria-label="Mais ações">...</button><div class="editor-tabs-menu hidden"><button type="button" data-editor-action="save">Salvar</button><button type="button" data-editor-action="close">Fechar editor</button><button type="button" data-editor-action="close-all">Fechar todos</button></div></div>');
+  if (editorTabs && !editorTabs.querySelector('.editor-tabs-actions')) {
+    editorTabs.insertAdjacentHTML('beforeend', '<div class="editor-tabs-actions"><button class="editor-tabs-menu-button" type="button" title="Mais ações" aria-label="Mais ações">...</button><div class="editor-tabs-menu hidden"><button type="button" data-editor-action="save">Salvar</button><button type="button" data-editor-action="close">Fechar editor</button><button type="button" data-editor-action="close-all">Fechar todos</button></div></div>');
+  }
   updateEditorTabsMenuVisibility();
-  editorTabs?.addEventListener('click', (event) => {
+  if (editorTabs && !editorTabs.dataset.tabsListener) {
+    editorTabs.dataset.tabsListener = 'true';
+  editorTabs.addEventListener('click', (event) => {
     const menuButton = event.target.closest('.editor-tabs-menu-button');
     if (menuButton) {
-      const menu = editorTabs.querySelector('.editor-tabs-menu');
-      if (menu) {
-        const isHidden = menu.classList.toggle('hidden');
-        if (!isHidden) {
-          const bounds = menuButton.getBoundingClientRect();
-          menu.style.top = `${bounds.bottom + 4}px`;
-          menu.style.right = `${window.innerWidth - bounds.right}px`;
-        }
-      }
       event.stopPropagation();
+      event.preventDefault();
+      let menu = document.querySelector('.editor-tabs-menu-portal');
+      if (!menu) {
+        menu = document.createElement('div');
+        menu.className = 'editor-tabs-menu editor-tabs-menu-portal hidden';
+        menu.innerHTML = '<button type="button" data-editor-action="save">Salvar</button><button type="button" data-editor-action="close">Fechar editor</button><button type="button" data-editor-action="close-all">Fechar todos</button>';
+        document.body.appendChild(menu);
+        menu.addEventListener('click', (menuEvent) => {
+          const action = menuEvent.target.closest('[data-editor-action]')?.dataset.editorAction;
+          if (action === 'save') saveActiveEditor();
+          if (action === 'close') closeActiveEditor();
+          if (action === 'close-all') [...document.querySelectorAll('.editor-tab')].forEach((tab) => closeEditorTab(tab.dataset.file));
+          if (action) menu.classList.add('hidden');
+          menuEvent.stopPropagation();
+        });
+      }
+      const isHidden = menu.classList.toggle('hidden');
+      if (!isHidden) {
+        const bounds = menuButton.getBoundingClientRect();
+        menu.style.top = `${bounds.bottom + 4}px`;
+        menu.style.left = 'auto';
+        menu.style.right = `${window.innerWidth - bounds.right}px`;
+      }
       return;
     }
     const action = event.target.closest('[data-editor-action]')?.dataset.editorAction;
     if (action === 'save') saveActiveEditor();
     if (action === 'close') closeActiveEditor();
     if (action === 'close-all') [...editorTabs.querySelectorAll('.editor-tab')].forEach((tab) => closeEditorTab(tab.dataset.file));
-    if (action) editorTabs.querySelector('.editor-tabs-menu')?.classList.add('hidden');
+    if (action) document.querySelector('.editor-tabs-menu-portal')?.classList.add('hidden');
     const closeButton = event.target.closest('.editor-tab-close');
     const tab = event.target.closest('.editor-tab');
     if (!tab) return;
@@ -414,18 +432,21 @@ function setupWorkspaceControls(workspace) {
       return;
     }
     if (tab.dataset.file) selectWorkspaceFile(tab.dataset.file);
-  });
+    });
+  }
   if (!editorTabsMenuGuardsInstalled) {
     editorTabsMenuGuardsInstalled = true;
+    setTimeout(() => {
     document.addEventListener('click', (event) => {
-      const tabsMenu = document.querySelector('.editor-tabs-menu');
+      const tabsMenu = document.querySelector('.editor-tabs-menu-portal');
       if (!tabsMenu || tabsMenu.classList.contains('hidden')) return;
       if (tabsMenu.contains(event.target) || event.target.closest?.('.editor-tabs-menu-button')) return;
       tabsMenu.classList.add('hidden');
     });
+    }, 0);
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
-      const tabsMenu = document.querySelector('.editor-tabs-menu');
+      const tabsMenu = document.querySelector('.editor-tabs-menu-portal');
       if (tabsMenu && !tabsMenu.classList.contains('hidden')) tabsMenu.classList.add('hidden');
     });
   }

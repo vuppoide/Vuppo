@@ -451,7 +451,7 @@ button { cursor:pointer; }
 .editor-tabs-actions { position:sticky; right:0; flex:0 0 50px; display:grid; place-items:center; margin-left:auto; border-left:1px solid #2b2b2b; background:#1b1b1b; }
 .editor-tabs-menu-button { width:38px; height:31px; border:0; border-radius:0; color:#c8c8c8; background:transparent; font:17px/1 Manrope,Arial,sans-serif; letter-spacing:2px; cursor:pointer; }
 .editor-tabs-menu-button:hover { color:#fff; background:transparent; }
-.editor-tabs-menu { position:fixed; z-index:200; top:auto; right:auto; display:flex; flex-direction:column; min-width:170px; padding:5px; border:1px solid #555; border-radius:5px; background:#242424; box-shadow:0 10px 22px rgba(0,0,0,.45); }
+.editor-tabs-menu { position:fixed; z-index:1000; top:auto; right:auto; display:flex; flex-direction:column; min-width:170px; padding:5px; border:1px solid #555; border-radius:5px; background:#242424; box-shadow:0 10px 22px rgba(0,0,0,.45); }
 .editor-tabs-actions.hidden { display:none; }
 .editor-tabs-menu.hidden { display:none; }.editor-tabs-menu button { border:0; padding:8px 10px; color:#ccc; background:transparent; font:10px Manrope,Arial,sans-serif; text-align:left; cursor:pointer; }.editor-tabs-menu button:hover { color:#fff; background:#363636; }
 .editor-tab { flex:0 0 150px; min-width:150px; display:flex; align-items:center; gap:7px; }.editor-tab-icon { width:16px; height:16px; display:grid; flex:0 0 16px; place-items:center; }.editor-tab-icon img { width:16px; height:16px; object-fit:contain; }.editor-tab-name { min-width:0; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
