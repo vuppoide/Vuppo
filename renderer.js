@@ -956,17 +956,40 @@ function setupWorkspaceControls(workspace) {
     terminalInput.disabled = false;
     focusTerminal();
   };
+  const normalizeTerminalText = (text) => (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const restoreTerminalInput = () => {
     if (!activeTerminalSession) return;
-    const output = activeTerminalSession.output;
-    const typedText = terminalInput.value.startsWith(output)
-      ? terminalInput.value.slice(output.length)
-      : activeTerminalSession.inputBuffer;
-    activeTerminalSession.inputBuffer = typedText;
+    // O <textarea> normaliza \r\n para \n, então precisamos comparar com o output normalizado.
+    // Sem isso, o startsWith falhava após o primeiro comando (que traz \r\n do backend)
+    // e todo paste posterior era descartado — parecia que "só o primeiro colar funcionava".
+    const output = normalizeTerminalText(activeTerminalSession.output);
+    activeTerminalSession.output = output;
+    const current = terminalInput.value || '';
+    if (current.startsWith(output)) {
+      activeTerminalSession.inputBuffer = current.slice(output.length);
+    } else {
+      // Edição no meio do histórico: descarta a edição e restaura a visão correta.
+      // (O caso do paste já é tratado movendo o caret para o fim no evento 'paste'.)
+    }
     renderTerminalInput();
   };
   const appendTerminalOutput = (session, data) => {
-    session.output += data;
+    const text = normalizeTerminalText(data || '');
+    // Logo após um "limpar", o shell responde com o eco do próprio cls/prompt.
+    // Descarta esse resíduo para a tela ficar realmente limpa.
+    if (session.clearGeneration && session.clearPending !== false) {
+      session.clearPending = false;
+      setTimeout(() => {
+        if (session.clearPending === false) session.clearPending = true;
+      }, 400);
+      const stripped = text.replace(/^(cls|clear)[\n]*/i, '').trim();
+      if (!stripped) return;
+      // Se só veio prompt/eco curto, ignora também
+      if (stripped.length < 80 && !/error|erro|fail/i.test(stripped)) return;
+    }
+    session.output = `${session.output || ''}${text}`;
+    // Evita crescimento infinito do buffer (mantém últimos ~100k chars)
+    if (session.output.length > 100000) session.output = session.output.slice(-100000);
     if (session === activeTerminalSession) {
       const wasFocused = document.activeElement === terminalScreen;
       terminalScreen.value = `${session.output}${session.inputBuffer}`;
@@ -978,12 +1001,14 @@ function setupWorkspaceControls(workspace) {
     }
   };
   const createTerminalSession = async (tab) => {
-    const session = terminalSessions.get(tab) || { tab, id: null, output: '', inputBuffer: '' };
+    const session = terminalSessions.get(tab) || { tab, id: null, output: '', inputBuffer: '', platform: 'win32' };
       terminalSessions.set(tab, session);
       session.inputBuffer = '';
+      session.output = '';
     try {
       const terminal = await window.vuppo.createTerminal(currentReport.projectPath);
       session.id = terminal.id;
+      session.platform = terminal.platform || 'win32';
       tab.querySelector('.terminal-tab-label').textContent = terminal.shell;
       if (session === activeTerminalSession) {
         terminalInput.disabled = false;
@@ -1005,12 +1030,27 @@ function setupWorkspaceControls(workspace) {
     if (!activeTerminalSession?.id) return;
     const input = activeTerminalSession.inputBuffer;
     if (!input.trim()) return;
-    await window.vuppo.writeTerminal(activeTerminalSession.id, `${input}\r\n`);
+    // Normaliza quebras de linha coladas (\n) para o padrão do shell (\r\n)
+    const normalized = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+    await window.vuppo.writeTerminal(activeTerminalSession.id, `${normalized}\r\n`);
     activeTerminalSession.inputBuffer = '';
     terminalInput.value = activeTerminalSession.output;
     terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
     updateTerminalCaret();
   };
+  // Cola com botão direito / Ctrl+V / menu de contexto: o navegador insere o texto
+  // no <textarea> e dispara 'input' -> restoreTerminalInput já captura. Como o
+  // output ocupa o início do <textarea>, forçamos o caret para o fim ANTES da
+  // inserção (o evento 'paste' dispara antes), senão o texto colado no meio
+  // quebraria o prefixo do output e seria descartado.
+  terminalInput.addEventListener('paste', () => {
+    try { terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length); } catch { /* sem seleção */ }
+    requestAnimationFrame(() => {
+      restoreTerminalInput();
+      terminalInput.scrollTop = terminalInput.scrollHeight;
+      updateTerminalCaret();
+    });
+  });
   terminalPanel.addEventListener('keydown', async (event) => {
     if (event.target !== terminalInput && event.target.closest('button')) return;
     if (event.key === 'Enter') {
@@ -1069,18 +1109,26 @@ function setupWorkspaceControls(workspace) {
   };
   const clearTerminalSession = async (session) => {
     if (!session) return;
-    if (session.id) {
-      const clearCommand = process.platform === 'win32' ? 'cls\r' : 'clear\r';
-      await window.vuppo.writeTerminal(session.id, clearCommand);
-    }
+    // Guarda o id da sessão e limpa o buffer local primeiro: o backend (powershell/cmd)
+    // responde ao 'cls' com o próprio output, então marcamos uma geração para ignorar
+    // esse eco e a limpeza valer na hora, inclusive na primeira sessão.
+    const sessionId = session.id;
+    const clearGeneration = (session.clearGeneration || 0) + 1;
+    session.clearGeneration = clearGeneration;
     session.output = '';
     session.inputBuffer = '';
     if (session === activeTerminalSession) {
       terminalScreen.value = '';
       terminalInput.value = '';
-      terminalInput.setSelectionRange(0, 0);
+      try { terminalInput.setSelectionRange(0, 0); } catch { /* sem seleção */ }
     }
     updateTerminalCaret();
+    if (sessionId) {
+      try {
+        const clearCommand = session.platform === 'win32' ? 'cls\r' : 'clear\r';
+        await window.vuppo.writeTerminal(sessionId, clearCommand);
+      } catch { /* terminal pode já ter sido encerrado; a tela já foi limpa acima */ }
+    }
   };
   const hideTerminalActionsMenu = () => terminalActionsMenu.classList.add('hidden');
   const showTerminalActionsMenu = (tab, event) => {
@@ -1169,7 +1217,7 @@ function setupWorkspaceControls(workspace) {
     hideTerminalActionsMenu();
   });
   const initialTerminalTab = terminalTabs.querySelector('.terminal-tab');
-  terminalSessions.set(initialTerminalTab, { tab: initialTerminalTab, id: null, output: '', inputBuffer: '' });
+  terminalSessions.set(initialTerminalTab, { tab: initialTerminalTab, id: null, output: '', inputBuffer: '', platform: 'win32' });
   activateTerminal(initialTerminalTab);
   createTerminalSession(initialTerminalTab);
   workspace.querySelector('.workspace-topbar').insertAdjacentHTML('beforeend', '<div class="profile-menu hidden"><strong>Perfil</strong><span>Conta local Vuppo</span><button type="button" class="profile-menu-item" data-profile-action="settings" title="Configurações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.08h-2.4v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.46 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-2.4h.08A1.7 1.7 0 0 0 8.46 10a1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h2.4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v2.4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Configurações</span></button><button type="button" class="profile-close">Fechar</button></div>');
