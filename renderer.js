@@ -1710,9 +1710,9 @@ function renderLegacyFileEditor(editorContent, fileData, findingLine, fallbackTe
   codeEditor.tabIndex = 0;
   codeEditor.focus();
   const MINIMAP_BASE_WIDTH = DEFAULT_SETTINGS.editorMinimapWidth;
-  const MINIMAP_LINE_HEIGHT = 3;
-  const MINIMAP_CHAR_WIDTH = 2;
-  const MINIMAP_FONT_SIZE = 4;
+  const MINIMAP_LINE_HEIGHT = 7;
+  const MINIMAP_CHAR_WIDTH = 4.2;
+  const MINIMAP_FONT_SIZE = 7;
   const minimapScale = () => getMinimapWidth() / MINIMAP_BASE_WIDTH;
   const drawMinimap = () => {
     const lines = codeEditor.innerText.replace(/\r\n/g, '\n').split('\n');
